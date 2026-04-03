@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Inspire — Dashboard ao Vivo</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore-compat.js"></script>
+<style>
+:root{
+  --sage:#87a492;--sage-dark:#5f7d6e;--sage-light:#a8c4b0;
+  --sage-pale:#e8f0eb;--sage-mist:#f2f6f3;--forest:#1a2620;
+  --text-mid:#3d5045;--text-light:#6b8a74;--gold:#c9a96e;
+  --border:#d4e0d8;--white:#ffffff;
+  --ok:#5a9e7a;--ok-bg:rgba(90,158,122,.1);
+  --warn:#c9a96e;--warn-bg:rgba(201,169,110,.12);
+  --err:#b05a5a;--err-bg:rgba(176,90,90,.08);
+  --font-d:'Cormorant Garamond',Georgia,serif;
+  --font-b:'Jost',sans-serif;
+  --r:10px;--r-sm:6px;--r-lg:16px;
+  --sh:0 2px 12px rgba(90,125,104,.1);
+  --sh-lg:0 8px 32px rgba(44,58,49,.15);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{font-family:var(--font-b);background:var(--sage-mist);color:var(--forest);min-height:100vh;-webkit-font-smoothing:antialiased;display:flex;flex-direction:column;font-size:1rem}
+h1,h2,h3{font-family:var(--font-d);font-weight:400}
+
+.dash-header{
+  background:var(--sage);padding:13px 20px;
+  display:flex;align-items:center;justify-content:space-between;
+  box-shadow:var(--sh-lg);flex-shrink:0;gap:12px;
+}
+.dash-logo{height:34px;width:auto;object-fit:contain;flex-shrink:0}
+.dash-event-name{
+  font-family:var(--font-d);font-size:1.4rem;font-weight:400;
+  color:#fff;flex:1;text-align:center;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  padding:0 10px;
+}
+.dash-sync{display:flex;align-items:center;gap:6px;font-size:.88rem;color:rgba(255,255,255,.85);flex-shrink:0}
+.sync-dot{width:9px;height:9px;border-radius:50%;background:rgba(255,255,255,.4);flex-shrink:0}
+.sync-dot.online{background:#7ecf9a;box-shadow:0 0 6px #7ecf9a}
+.sync-dot.offline{background:#e08080}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.sync-dot.syncing{background:var(--gold);animation:blink 1s infinite}
+
+.dash-main{flex:1;padding:24px 16px}
+.dash-container{width:100%;max-width:860px;margin:0 auto}
+
+.mode-selector{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:28px}
+@media(max-width:480px){.mode-selector{grid-template-columns:1fr;gap:12px}}
+.mode-card{
+  background:var(--white);border:2px solid var(--border);border-radius:var(--r-lg);
+  padding:28px 18px;text-align:center;cursor:pointer;transition:all .2s;box-shadow:var(--sh);
+}
+.mode-card:hover{border-color:var(--sage);transform:translateY(-2px);box-shadow:var(--sh-lg)}
+.mode-card:active{transform:scale(.98)}
+.mode-icon{font-size:2.4rem;margin-bottom:10px}
+.mode-title{font-family:var(--font-d);font-size:1.7rem;color:var(--forest);margin-bottom:6px}
+.mode-desc{font-size:.92rem;color:var(--text-light)}
+
+.event-title-block{text-align:center;margin-bottom:24px}
+.event-name{font-family:var(--font-d);font-size:2.6rem;font-weight:300;color:var(--forest);line-height:1.15}
+.event-meta{font-size:.96rem;color:var(--text-light);margin-top:6px}
+
+/* KPIs — 4 cards, sem gráficos, sem textos extras */
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
+@media(max-width:640px){.kpi-grid{grid-template-columns:repeat(2,1fr);gap:10px}}
+@media(max-width:320px){.kpi-grid{grid-template-columns:1fr 1fr}}
+.kpi-card{
+  background:var(--white);border:1.5px solid var(--border);border-radius:var(--r-lg);
+  padding:22px 10px;text-align:center;box-shadow:var(--sh);
+}
+.kpi-card.ok{border-color:rgba(90,158,122,.4);background:var(--ok-bg)}
+.kpi-card.warn{border-color:rgba(201,169,110,.4);background:var(--warn-bg)}
+.kpi-card.sage{border-color:var(--sage-light);background:var(--sage-pale)}
+.kpi-num{font-family:var(--font-d);font-size:3.2rem;font-weight:300;line-height:1;color:var(--forest)}
+.kpi-card.ok .kpi-num{color:var(--ok)}
+.kpi-card.warn .kpi-num{color:#8a6430}
+.kpi-lbl{font-size:.84rem;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--text-light);margin-top:5px}
+
+.search-wrap{margin-bottom:14px}
+.dash-search{
+  width:100%;padding:12px 18px;border:1.5px solid var(--border);border-radius:30px;
+  font-family:var(--font-b);font-size:1rem;color:var(--forest);background:var(--white);
+  -webkit-appearance:none;outline:none;transition:border-color .2s;box-shadow:var(--sh);
+}
+.dash-search:focus{border-color:var(--sage)}
+
+.guest-list{display:flex;flex-direction:column;gap:6px}
+.guest-item{
+  background:var(--white);border:1.5px solid var(--border);border-radius:var(--r);
+  padding:11px 14px;display:flex;align-items:flex-start;gap:10px;box-shadow:var(--sh);
+}
+.guest-item.presente{background:var(--ok-bg);border-color:rgba(90,158,122,.3)}
+.guest-dot{width:10px;height:10px;border-radius:50%;background:var(--border);flex-shrink:0;margin-top:5px}
+.guest-item.presente .guest-dot{background:var(--ok)}
+.guest-info{flex:1;min-width:0}
+.guest-name{font-weight:700;color:var(--forest);font-size:1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.guest-meta{font-size:.88rem;color:var(--text-light);margin-top:2px}
+.guest-hostes{font-size:.82rem;color:var(--sage-dark);font-style:italic;margin-top:2px}
+.guest-badge{font-size:.8rem;font-weight:600;padding:3px 10px;border-radius:20px;white-space:nowrap;flex-shrink:0;margin-top:3px}
+.guest-badge.presente{background:var(--ok-bg);color:var(--ok);border:1px solid rgba(90,158,122,.3)}
+.guest-badge.aguardando{background:var(--sage-pale);color:var(--text-light);border:1px solid var(--border)}
+.guest-badge.confirmado{background:var(--sage-pale);color:var(--sage-dark);border:1px solid var(--sage-light)}
+.guest-badge.recusado{background:var(--err-bg);color:var(--err);border:1px solid rgba(176,90,90,.25)}
+.guest-badge.sem_telefone,.guest-badge.telefone_invalido{background:#fce4ec;color:#880e4f;border:1px solid rgba(136,14,79,.2)}
+.guest-badge.primeiro_contato{background:#e8eaf6;color:#3949ab;border:1px solid rgba(57,73,171,.2)}
+.guest-badge.duvida{background:#fff3e0;color:#bf6000;border:1px solid rgba(191,96,0,.2)}
+
+.back-btn{
+  display:inline-flex;align-items:center;gap:5px;background:none;
+  border:1.5px solid var(--border);border-radius:20px;padding:8px 16px;
+  font-family:var(--font-b);font-size:.92rem;color:var(--text-mid);
+  cursor:pointer;margin-bottom:18px;transition:all .2s;
+}
+.back-btn:hover{border-color:var(--sage);color:var(--sage-dark)}
+
+.no-results{text-align:center;padding:28px;color:var(--text-light);font-size:1rem}
+.loading{text-align:center;padding:48px;color:var(--text-light);font-size:1rem}
+.dash-error{text-align:center;padding:48px 16px;color:var(--err)}
+.dash-error h2{font-family:var(--font-d);font-size:2rem;margin-bottom:10px}
+
+.dash-footer{
+  background:var(--forest);color:rgba(255,255,255,.5);text-align:center;
+  padding:12px 16px;font-size:.88rem;letter-spacing:.04em;flex-shrink:0;
+}
+.dash-footer .fl{font-family:var(--font-d);font-style:italic;font-size:1.05rem;color:rgba(255,255,255,.7);margin-right:5px}
+.dash-footer strong{color:rgba(255,255,255,.75)}
+</style>
+</head>
+<body>
+
+<header class="dash-header">
+  <img src="logo-white.png" class="dash-logo" alt="Inspire">
+  <div class="dash-event-name" id="header-event-name"></div>
+  <div class="dash-sync">
+    <div class="sync-dot syncing" id="sync-dot"></div>
+    <span id="sync-txt">Online</span>
+  </div>
+</header>
+
+<main class="dash-main">
+  <div class="dash-container">
+
+    <div id="loading-state" class="loading">⟳ Carregando...</div>
+
+    <div id="error-state" class="dash-error" style="display:none">
+      <h2>Evento não encontrado</h2>
+      <p>Verifique se o link está correto.</p>
+    </div>
+
+    <!-- SELETOR DE MODO -->
+    <div id="mode-select-screen" style="display:none">
+      <div class="event-title-block">
+        <div class="event-name" id="mode-event-name">—</div>
+        <div class="event-meta" id="mode-event-meta"></div>
+      </div>
+      <div class="mode-selector">
+        <div class="mode-card" onclick="showMode('checkin')">
+          <div class="mode-icon">✓</div>
+          <div class="mode-title">Acompanhar Recepção</div>
+          <div class="mode-desc">Presença real · Check-in · PAX · PP</div>
+        </div>
+        <div class="mode-card" onclick="showMode('rsvp')">
+          <div class="mode-icon">📋</div>
+          <div class="mode-title">Acompanhar RSVP</div>
+          <div class="mode-desc">Confirmações · Aguardando · Recusados</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAINEL CHECK-IN -->
+    <div id="checkin-screen" style="display:none">
+      <button class="back-btn" onclick="backToModes()">← Voltar</button>
+      <div class="event-title-block">
+        <div class="event-name" id="ci-event-name">—</div>
+        <div class="event-meta" id="ci-event-meta"></div>
+      </div>
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-num" id="ci-total">0</div>
+          <div class="kpi-lbl">Total</div>
+        </div>
+        <div class="kpi-card ok">
+          <div class="kpi-num" id="ci-presentes">0</div>
+          <div class="kpi-lbl">Presentes</div>
+        </div>
+        <div class="kpi-card warn">
+          <div class="kpi-num" id="ci-ausentes">0</div>
+          <div class="kpi-lbl">Ausentes</div>
+        </div>
+        <div class="kpi-card sage">
+          <div class="kpi-num" id="ci-taxa">0%</div>
+          <div class="kpi-lbl">Taxa %</div>
+        </div>
+      </div>
+      <div class="search-wrap">
+        <input class="dash-search" type="text" placeholder="🔍 Buscar convidado..." oninput="filterCheckin(this.value)">
+      </div>
+      <div id="ci-guest-list" class="guest-list"></div>
+    </div>
+
+    <!-- PAINEL RSVP -->
+    <div id="rsvp-screen" style="display:none">
+      <button class="back-btn" onclick="backToModes()">← Voltar</button>
+      <div class="event-title-block">
+        <div class="event-name" id="rsvp-event-name">—</div>
+        <div class="event-meta" id="rsvp-event-meta"></div>
+      </div>
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-num" id="rsvp-total">0</div>
+          <div class="kpi-lbl">Total</div>
+        </div>
+        <div class="kpi-card sage">
+          <div class="kpi-num" id="rsvp-conf">0</div>
+          <div class="kpi-lbl">Confirmados</div>
+        </div>
+        <div class="kpi-card warn">
+          <div class="kpi-num" id="rsvp-wait">0</div>
+          <div class="kpi-lbl">Aguardando</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-num" id="rsvp-recus">0</div>
+          <div class="kpi-lbl">Recusados</div>
+        </div>
+      </div>
+      <div class="search-wrap">
+        <input class="dash-search" type="text" placeholder="🔍 Buscar convidado..." oninput="filterRsvp(this.value)">
+      </div>
+      <div id="rsvp-guest-list" class="guest-list"></div>
+    </div>
+
+  </div>
+</main>
+
+<footer class="dash-footer">
+  <span class="fl">Inspire</span>
+  <strong>Consultoria e Produção de Eventos</strong>
+  &nbsp;·&nbsp; Gestão Inteligente
+</footer>
+
+<script>
+const firebaseConfig={
+  apiKey:"AIzaSyA-OO5KMWWPAZZZgNsMKAFGEXHdnFdn5ws",
+  authDomain:"inspire-eventos.firebaseapp.com",
+  projectId:"inspire-eventos",
+  storageBucket:"inspire-eventos.firebasestorage.app",
+  messagingSenderId:"918627808937",
+  appId:"1:918627808937:web:f168503474f4c0095a9bb8"
+};
+firebase.initializeApp(firebaseConfig);
+const db=firebase.firestore();
+
+function setSyncStatus(s){
+  const d=document.getElementById('sync-dot'),t=document.getElementById('sync-txt');
+  d.className='sync-dot '+s;
+  t.textContent=s==='online'?'Online':s==='offline'?'Offline':'Sincronizando...';
+}
+window.addEventListener('online',()=>setSyncStatus('online'));
+window.addEventListener('offline',()=>setSyncStatus('offline'));
+
+function fmtDate(iso){if(!iso)return'';const[y,m,d]=iso.split('-');return`${d}/${m}/${y}`;}
+function fmtTime(ts){if(!ts)return'';return new Date(ts).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});}
+function norm(s){return(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+const STATUS_LABELS={confirmado:'Confirmado',aguardando:'Aguardando',recusado:'Recusado',sem_telefone:'Sem telefone',telefone_invalido:'Tel. inválido',primeiro_contato:'1º Contato',duvida:'Com dúvida'};
+function statusLabel(s){return STATUS_LABELS[s]||s||'Aguardando';}
+
+let _allGuests=[],_eventData=null,_ciSearch='',_rsvpSearch='',_currentMode=null;
+
+function showMode(mode){
+  _currentMode=mode;
+  document.getElementById('mode-select-screen').style.display='none';
+  document.getElementById('checkin-screen').style.display=mode==='checkin'?'':'none';
+  document.getElementById('rsvp-screen').style.display=mode==='rsvp'?'':'none';
+  if(_eventData){
+    const meta=[];
+    if(_eventData.data)meta.push('📅 '+fmtDate(_eventData.data)+(_eventData.time?' às '+_eventData.time:''));
+    if(_eventData.venue)meta.push('📍 '+_eventData.venue);
+    const ms=meta.join('  ·  ');
+    if(mode==='checkin'){document.getElementById('ci-event-name').textContent=_eventData.nome||'';document.getElementById('ci-event-meta').textContent=ms;}
+    if(mode==='rsvp'){document.getElementById('rsvp-event-name').textContent=_eventData.nome||'';document.getElementById('rsvp-event-meta').textContent=ms;}
+  }
+  if(mode==='checkin')renderCheckin();
+  if(mode==='rsvp')renderRsvp();
+}
+
+function backToModes(){
+  _currentMode=null;_ciSearch='';_rsvpSearch='';
+  document.getElementById('checkin-screen').style.display='none';
+  document.getElementById('rsvp-screen').style.display='none';
+  document.getElementById('mode-select-screen').style.display='';
+}
+
+function renderCheckin(){
+  const total=_allGuests.length;
+  const pres=_allGuests.filter(g=>g.checkedIn).length;
+  const aus=total-pres;
+  const taxa=total>0?Math.round((pres/total)*100):0;
+  document.getElementById('ci-total').textContent=total;
+  document.getElementById('ci-presentes').textContent=pres;
+  document.getElementById('ci-ausentes').textContent=aus;
+  document.getElementById('ci-taxa').textContent=taxa+'%';
+  filterCheckin(_ciSearch);
+}
+
+function filterCheckin(q){
+  _ciSearch=q;
+  let list=_allGuests;
+  if(q){const nq=norm(q);list=list.filter(g=>norm(g.nome).includes(nq));}
+  const sorted=list.slice().sort((a,b)=>{
+    if(a.checkedIn&&!b.checkedIn)return-1;
+    if(!a.checkedIn&&b.checkedIn)return 1;
+    return norm(a.nome).localeCompare(norm(b.nome));
+  });
+  const c=document.getElementById('ci-guest-list');
+  if(!sorted.length){c.innerHTML=`<div class="no-results">${q?'Nenhum convidado encontrado.':'Nenhum convidado cadastrado.'}</div>`;return;}
+  c.innerHTML=sorted.map(g=>{
+    const pax=1+(g.acompanhantes||0);
+    const pp=g.checkedIn?(g.presentesNaEntrada||1):null;
+    const parts=['PAX '+pax];
+    if(g.checkedIn){parts.push('PP '+(pp||1));if(g.checkinTime)parts.push(fmtTime(g.checkinTime));}
+    const hostesLine=g.checkedIn&&g.checkedBy?`<div class="guest-hostes">✓ por ${esc(g.checkedBy)}${g.extraNome?' · Acomp: '+esc(g.extraNome):''}</div>`:'';
+    return `<div class="guest-item${g.checkedIn?' presente':''}">
+      <div class="guest-dot"></div>
+      <div class="guest-info">
+        <div class="guest-name">${esc(g.nome)}</div>
+        <div class="guest-meta">${parts.join(' · ')}</div>
+        ${hostesLine}
+      </div>
+      <span class="guest-badge ${g.checkedIn?'presente':'aguardando'}">${g.checkedIn?'✓ Presente':'Aguardando'}</span>
+    </div>`;
+  }).join('');
+}
+
+function renderRsvp(){
+  const total=_allGuests.length;
+  const conf=_allGuests.filter(g=>g.status==='confirmado').length;
+  const wait=_allGuests.filter(g=>!g.status||g.status==='aguardando'||g.status==='primeiro_contato'||g.status==='duvida'||g.status==='sem_telefone'||g.status==='telefone_invalido').length;
+  const recus=_allGuests.filter(g=>g.status==='recusado').length;
+  document.getElementById('rsvp-total').textContent=total;
+  document.getElementById('rsvp-conf').textContent=conf;
+  document.getElementById('rsvp-wait').textContent=wait;
+  document.getElementById('rsvp-recus').textContent=recus;
+  filterRsvp(_rsvpSearch);
+}
+
+function filterRsvp(q){
+  _rsvpSearch=q;
+  let list=_allGuests;
+  if(q){const nq=norm(q);list=list.filter(g=>norm(g.nome).includes(nq));}
+  const sorted=list.slice().sort((a,b)=>norm(a.nome).localeCompare(norm(b.nome)));
+  const c=document.getElementById('rsvp-guest-list');
+  if(!sorted.length){c.innerHTML=`<div class="no-results">${q?'Nenhum convidado encontrado.':'Nenhum convidado cadastrado.'}</div>`;return;}
+  c.innerHTML=sorted.map(g=>{
+    const pax=1+(g.acompanhantes||0);
+    const st=g.status||'aguardando';
+    return `<div class="guest-item">
+      <div class="guest-dot" style="background:${st==='confirmado'?'var(--ok)':st==='recusado'?'var(--err)':'var(--border)'}"></div>
+      <div class="guest-info">
+        <div class="guest-name">${esc(g.nome)}</div>
+        <div class="guest-meta">PAX ${pax}${g.acompanhantes?' · '+g.acompanhantes+' acomp.':''}</div>
+      </div>
+      <span class="guest-badge ${st}">${statusLabel(st)}</span>
+    </div>`;
+  }).join('');
+}
+
+// ── INIT ──
+const params=new URLSearchParams(location.search);
+const evId=params.get('ev');
+if(!evId){
+  document.getElementById('loading-state').style.display='none';
+  document.getElementById('error-state').style.display='';
+}else{
+  db.collection('events').doc(evId).get().then(doc=>{
+    if(!doc.exists){
+      document.getElementById('loading-state').style.display='none';
+      document.getElementById('error-state').style.display='';
+      return;
+    }
+    _eventData=doc.data();
+    const nome=_eventData.nome||'Evento';
+    document.getElementById('header-event-name').textContent=nome;
+    document.getElementById('mode-event-name').textContent=nome;
+    const meta=[];
+    if(_eventData.data)meta.push('📅 '+fmtDate(_eventData.data)+(_eventData.time?' às '+_eventData.time:''));
+    if(_eventData.venue)meta.push('📍 '+_eventData.venue);
+    document.getElementById('mode-event-meta').textContent=meta.join('  ·  ');
+    document.getElementById('loading-state').style.display='none';
+    document.getElementById('mode-select-screen').style.display='';
+    setSyncStatus('online');
+    db.collection('events').doc(evId).collection('guests').onSnapshot(snap=>{
+      setSyncStatus('online');
+      _allGuests=snap.docs.map(d=>({...d.data(),id:d.id}));
+      if(_currentMode==='checkin')renderCheckin();
+      if(_currentMode==='rsvp')renderRsvp();
+    },err=>{setSyncStatus('offline');console.error(err);});
+  }).catch(err=>{
+    document.getElementById('loading-state').style.display='none';
+    document.getElementById('error-state').style.display='';
+    setSyncStatus('offline');
+    console.error(err);
+  });
+}
+</script>
+</body>
+</html>
