@@ -1,0 +1,1771 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Inspire — Gestão de Eventos</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#87a492">
+<meta name="description" content="Sistema de credenciamento, RSVP e check-in para eventos com suporte offline">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore-compat.js"></script>
+<style>
+/* ═══════════════════════════════════
+   INSPIRE — Design System V10 (Responsivo)
+   ═══════════════════════════════════ */
+:root{
+  --sage:#87a492;
+  --sage-dark:#5f7d6e;
+  --sage-light:#a8c4b0;
+  --sage-pale:#e8f0eb;
+  --sage-mist:#f2f6f3;
+  --forest:#1a2620;
+  --text-mid:#3d5045;
+  --text-light:#6b8a74;
+  --gold:#c9a96e;
+  --border:#d4e0d8;
+  --white:#ffffff;
+  --cream:#faf8f5;
+  --ok:#5a9e7a;
+  --ok-bg:rgba(90,158,122,.1);
+  --warn:#c9a96e;
+  --warn-bg:rgba(201,169,110,.12);
+  --err:#b05a5a;
+  --err-bg:rgba(176,90,90,.08);
+  --font-d:'Cormorant Garamond',Georgia,serif;
+  --font-b:'Jost',sans-serif;
+  --r:10px;--r-sm:6px;--r-lg:16px;
+  --sh:0 2px 12px rgba(90,125,104,.1);
+  --sh-lg:0 8px 32px rgba(44,58,49,.15);
+  --tr:.2s cubic-bezier(.4,0,.2,1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{font-family:var(--font-b);background:var(--sage-mist);color:var(--forest);min-height:100vh;-webkit-font-smoothing:antialiased;overflow-x:hidden;display:flex;flex-direction:column}
+h1,h2,h3{font-family:var(--font-d);font-weight:400}
+button{cursor:pointer;font-family:var(--font-b);-webkit-tap-highlight-color:transparent}
+input,select,textarea{font-family:var(--font-b);font-size:16px}/* 16px prevents iOS zoom */
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-thumb{background:var(--sage-light);border-radius:2px}
+
+/* ── HEADER ── */
+.app-header{
+  position:sticky;top:0;z-index:200;
+  background:var(--sage);
+  display:flex;align-items:center;justify-content:space-between;
+  min-height:60px;
+  box-shadow:var(--sh-lg);
+  padding:8px 16px;
+  gap:14px;
+}
+.header-logo-wrap{
+  display:flex;align-items:center;
+  flex-shrink:0;
+  padding-right:12px;
+  border-right:1px solid rgba(255,255,255,.28);
+  cursor:pointer;
+}
+.header-logo{height:28px;width:auto;object-fit:contain;display:block}
+.header-logo-wrap:hover .header-logo{transform:scale(1.03)}
+
+/* Menu horizontal em todos os dispositivos */
+.hamburger{display:none !important}
+.header-nav{
+  display:flex;
+  flex-direction:row;
+  gap:16px;
+  padding:0 4px;
+  overflow-x:auto;
+  flex:1;
+  -webkit-overflow-scrolling:touch;
+  scrollbar-width:none;
+  align-items:center;
+  justify-content:center;
+}
+.header-nav::-webkit-scrollbar{display:none}
+.nav-tab{
+  padding:8px 0;
+  border:none;
+  background:none;
+  color:#fff;
+  cursor:pointer;
+  font-size:.82rem;
+  font-weight:600;
+  white-space:nowrap;
+  border-bottom:3px solid transparent;
+  transition:all var(--tr);
+  flex-shrink:0;
+}
+.nav-tab:hover{background:none;opacity:.9}
+.nav-tab.active{border-bottom-color:#fff}
+
+@media(max-width:900px){
+  .app-header{
+    min-height:auto;
+    padding:10px 12px;
+    gap:10px;
+    flex-wrap:wrap;
+  }
+  .header-logo-wrap{padding-right:10px}
+  .header-nav{
+    width:100%;
+    order:3;
+    justify-content:flex-start;
+    gap:14px;
+    padding-top:4px;
+  }
+  .nav-tab{font-size:.78rem}
+}
+
+/* ── LOGIN ── */
+.login-area{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin-left:auto;
+}
+.login-btn{
+  background:rgba(255,255,255,.16);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border:1.5px solid rgba(255,255,255,.55);
+  color:#fff;
+  padding:6px 14px;
+  border-radius:22px;
+  font-size:.8rem;
+  font-weight:700;
+  cursor:pointer;
+  transition:all var(--tr);
+}
+.login-btn:hover{
+  background:rgba(255,255,255,.24);
+  border-color:rgba(255,255,255,.72);
+}
+.logged-in{
+  font-size:.78rem;
+  color:#fff;
+  font-weight:600;
+}
+@media(max-width:900px){
+  .login-area{margin-left:auto}
+  .login-btn{padding:6px 12px;font-size:.76rem}
+}
+
+/* Container */
+.container{width:100%;max-width:1200px;margin:0 auto;padding:0 16px}
+.page{display:none}
+.page.active{display:block;padding-bottom:40px}
+
+/* ── PÁGINA BASE ── */
+.page-title{font-size:2.2rem;color:var(--forest);margin-bottom:4px;font-weight:300}
+.page-title em{font-style:italic;color:var(--sage)}
+.page-subtitle{font-size:.95rem;color:var(--text-light)}
+.page-header-row{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px;gap:16px}
+.action-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.card{background:var(--white);border-radius:var(--r-lg);padding:18px 16px;box-shadow:var(--sh);border:1px solid var(--border)}
+.card-head{font-family:var(--font-d);font-size:1.1rem;font-weight:400;margin-bottom:14px;color:var(--forest);display:flex;align-items:center;justify-content:space-between}
+.card-body{font-size:.95rem;line-height:1.5}
+
+.stat-card{background:var(--white);border:1px solid var(--border);border-radius:var(--r);padding:16px 12px;text-align:center}
+.stat-card.sage{background:var(--sage-pale);border-color:var(--sage-light)}
+.stat-card.warn{background:var(--warn-bg);border-color:rgba(201,169,110,.4)}
+.stat-val{font-family:var(--font-d);font-size:2.2rem;font-weight:300;color:var(--forest)}
+.stat-card.sage .stat-val{color:var(--sage-dark)}
+.stat-card.warn .stat-val{color:#8a6430}
+.stat-lbl{font-size:.7rem;font-weight:600;text-transform:uppercase;color:var(--text-light);margin-top:5px}
+
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+@media(max-width:600px){.stats-grid{grid-template-columns:repeat(2,1fr);gap:6px}}
+.stats-grid .stat-card{padding:12px 8px}
+.stats-grid .stat-val{font-size:1.8rem}
+.stats-grid .stat-lbl{font-size:.65rem}
+
+/* Feedback */
+.feedback-card{border-radius:var(--r-lg);padding:16px;text-align:center;margin-bottom:14px;display:flex;flex-direction:column;align-items:center;gap:5px;transition:all .35s ease}
+.feedback-card.idle{background:#eceff1}
+.feedback-card.success{background:var(--ok-bg);border:1.5px solid rgba(90,158,122,.3)}
+.feedback-card.error{background:var(--err-bg);border:1.5px solid rgba(176,90,90,.25)}
+.feedback-card.warn{background:var(--warn-bg);border:1.5px solid rgba(201,169,110,.35)}
+.fb-icon{font-size:2.2rem;line-height:1}
+.fb-name{font-family:var(--font-d);font-size:1.35rem;color:var(--forest)}
+.fb-msg{font-size:.95rem;font-weight:500}
+
+/* Checkin/Convidados UNIFICADO */
+.unified-layout{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:1024px){.unified-layout{grid-template-columns:1fr}}
+.unified-left{display:flex;flex-direction:column;gap:12px}
+.unified-right{display:flex;flex-direction:column;gap:12px}
+
+/* Camera (responsivo) */
+.cam-status{display:flex;align-items:center;gap:5px;font-size:.8rem;color:var(--text-light)}
+.cam-dot{width:7px;height:7px;border-radius:50%;background:var(--border)}
+.cam-dot.active{background:#4caf50;box-shadow:0 0 5px #4caf50}
+.cam-hint{font-size:.78rem;color:var(--text-light);margin-top:5px}
+#qr-reader{
+  width:100%;
+  max-width:100%;
+  height:auto;
+  aspect-ratio:1;
+  margin:0 auto;
+  display:block;
+  border-radius:var(--r-sm);
+  overflow:hidden;
+  border:2px solid var(--border);
+  background:var(--sage-mist)
+}
+#qr-reader video{
+  width:100% !important;
+  height:100% !important;
+  object-fit:cover;
+}
+@media(max-width:768px){
+  #qr-reader{max-width:320px}
+}
+@media(max-width:480px){
+  #qr-reader{max-width:100%;max-height:260px}
+}
+
+/* Busca Manual (posicionamento ACIMA) */
+.manual-section{order:-1}
+.manual-row{display:flex;gap:8px}
+@media(max-width:600px){
+  .manual-row{flex-direction:column}
+  .manual-row .btn{width:100%}
+}
+.manual-input{flex:1}
+
+/* Search results */
+.search-results-list{margin-top:8px;display:flex;flex-direction:column;gap:4px}
+.search-result-item{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border-radius:var(--r-sm);background:var(--sage-mist);font-size:.9rem;cursor:pointer;border:1.5px solid transparent;transition:all var(--tr)}
+.search-result-item:hover,.search-result-item:active{border-color:var(--sage);background:var(--sage-pale)}
+.sri-name{font-weight:600;color:var(--forest)}
+.sri-meta{font-size:.78rem;color:var(--text-light);margin-top:2px}
+
+/* Checkin list (responsivo) */
+.checkin-list{padding:8px;display:flex;flex-direction:column;gap:5px;overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1}
+.ci-guest-item{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  padding:10px 10px;
+  border-radius:var(--r-sm);
+  border:1.5px solid var(--border);
+  background:var(--white);
+  font-size:.88rem;
+  transition:all var(--tr);
+  flex-wrap:wrap;
+  min-height:auto;
+}
+.ci-guest-item.presente{background:var(--ok-bg);border-color:rgba(90,158,122,.3)}
+.ci-dot{width:9px;height:9px;border-radius:50%;background:var(--border);flex-shrink:0}
+.ci-guest-item.presente .ci-dot{background:var(--ok)}
+.ci-info{flex:1;min-width:0}
+.ci-name{font-weight:600;overflow:hidden;text-overflow:ellipsis;color:var(--forest);font-size:.9rem}
+.ci-meta{font-size:.78rem;color:var(--text-light);margin-top:1px}
+.ci-actions{display:flex;gap:6px;align-items:center;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end}
+.ci-btn{
+  background:var(--sage);
+  border:none;
+  color:#fff;
+  font-size:.76rem;
+  font-weight:600;
+  padding:6px 12px;
+  border-radius:20px;
+  cursor:pointer;
+  flex-shrink:0;
+  transition:background var(--tr);
+  touch-action:manipulation;
+  white-space:nowrap;
+  margin-top:4px;
+}
+@media(max-width:600px){
+  .ci-guest-item{
+    padding:8px 8px;
+    align-items:flex-start;
+  }
+  .ci-actions{width:100%;justify-content:flex-start}
+  .ci-btn{
+    margin-top:0;
+    padding:5px 10px;
+    font-size:.7rem;
+  }
+}
+.ci-btn:hover{background:var(--sage-dark)}
+.ci-btn:active{transform:scale(.96)}
+
+.badge-count{background:var(--sage);color:#fff;font-size:.72rem;font-weight:700;padding:2px 7px;border-radius:10px}
+
+/* Filtros */
+.filter-group{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px}
+.filter-btn{
+  padding:6px 12px;
+  border:1px solid var(--border);
+  background:var(--white);
+  border-radius:20px;
+  font-size:.8rem;
+  font-weight:600;
+  cursor:pointer;
+  transition:all var(--tr);
+}
+.filter-btn:hover{border-color:var(--sage)}
+.filter-btn.active{background:var(--sage);color:#fff;border-color:var(--sage)}
+
+.search-box{
+  width:100%;
+  padding:8px 12px;
+  border:1px solid var(--border);
+  border-radius:20px;
+  font-size:.88rem;
+  outline:none;
+  transition:border-color var(--tr);
+}
+.search-box:focus{border-color:var(--sage)}
+
+/* Buttons */
+.btn{
+  padding:8px 16px;
+  border:1px solid transparent;
+  border-radius:var(--r-sm);
+  font-size:.88rem;
+  font-weight:600;
+  cursor:pointer;
+  transition:all var(--tr);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:4px;
+  white-space:nowrap;
+}
+.btn-primary{background:var(--sage);color:#fff;border-color:var(--sage)}
+.btn-primary:hover{background:var(--sage-dark)}
+.btn-primary:active{transform:scale(.96)}
+.btn-outline{background:var(--white);color:var(--sage);border-color:var(--border)}
+.btn-outline:hover{background:var(--sage-pale)}
+.btn-danger{background:var(--err);color:#fff;border-color:var(--err)}
+.btn-danger:hover{background:#8a4a4a}
+
+/* Tabelas */
+.table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0}
+table{width:100%;border-collapse:collapse;font-size:.88rem}
+thead{background:var(--sage-pale);border-bottom:2px solid var(--border)}
+th{padding:10px 12px;text-align:left;font-weight:600;color:var(--forest)}
+td{padding:9px 12px;border-bottom:1px solid var(--border)}
+tr:hover{background:rgba(135,164,146,.05)}
+
+/* Reset */
+.reset-area{text-align:center;margin-top:20px;padding-top:14px;border-top:1px solid var(--sage-pale)}
+
+/* Modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(26,38,32,.55);display:none;align-items:center;justify-content:center;z-index:500;padding:16px;backdrop-filter:blur(3px);overflow-y:auto}
+.modal-overlay.open{display:flex}
+.modal{background:var(--white);border-radius:var(--r-lg);padding:24px;width:100%;max-width:480px;max-height:92vh;overflow-y:auto;position:relative;box-shadow:var(--sh-lg)}
+@media(max-width:480px){.modal{padding:20px;border-radius:var(--r);max-height:95vh}}
+.modal-close{position:absolute;top:12px;right:12px;background:none;border:none;font-size:1.1rem;cursor:pointer;color:var(--text-light);padding:4px 8px;border-radius:50%}
+.modal-close:hover{background:var(--sage-pale)}
+.modal-title{font-family:var(--font-d);font-size:1.8rem;font-weight:300;margin-bottom:18px;color:var(--forest)}
+.modal-title em{font-style:italic;color:var(--sage-dark)}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap}
+@media(max-width:480px){
+  .modal-actions{flex-direction:column-reverse}
+  .modal-actions .btn{width:100%}
+}
+
+/* Toast */
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--forest);color:#fff;padding:10px 20px;border-radius:24px;font-size:.88rem;font-weight:500;z-index:1000;transition:transform .3s cubic-bezier(.34,1.56,.64,1);pointer-events:none;white-space:nowrap;box-shadow:var(--sh-lg);max-width:90vw;text-align:center}
+.toast.show{transform:translateX(-50%) translateY(0)}
+.toast.ok{background:var(--ok)}
+.toast.err{background:var(--err)}
+
+.empty-state{text-align:center;padding:28px 16px;color:var(--text-light);font-size:.95rem}
+.icon-btn{background:none;border:none;cursor:pointer;font-size:1.05rem;padding:4px 5px;border-radius:var(--r-sm);color:var(--text-light);transition:all var(--tr);touch-action:manipulation}
+.icon-btn:hover{background:var(--sage-pale);color:var(--forest)}
+.icon-btn.danger:hover{background:var(--err-bg);color:var(--err)}
+
+/* Events list */
+.event-item{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:14px;
+  background:var(--white);
+  border:1px solid var(--border);
+  border-radius:var(--r);
+  margin-bottom:8px;
+  transition:all var(--tr)
+}
+.event-item:hover{border-color:var(--sage);box-shadow:var(--sh-lg)}
+.event-info{flex:1;min-width:0}
+.event-name{font-weight:600;color:var(--forest);font-size:.95rem}
+.event-meta{font-size:.78rem;color:var(--text-light);margin-top:2px}
+.event-item-actions{display:flex;gap:4px;flex-shrink:0;margin-left:10px}
+.event-item-actions .btn{padding:6px 10px;font-size:.76rem}
+
+/* Confirmação */
+.confirm-overlay{position:fixed;inset:0;background:rgba(26,38,32,.65);display:none;z-index:600;align-items:center;justify-content:center}
+.confirm-overlay.open{display:flex}
+.confirm-modal{background:var(--white);border-radius:var(--r-lg);padding:28px;width:100%;max-width:380px;box-shadow:var(--sh-lg)}
+.confirm-title{font-family:var(--font-d);font-size:1.6rem;margin-bottom:12px;color:var(--forest)}
+.confirm-msg{font-size:.95rem;color:var(--text-light);margin-bottom:20px;line-height:1.5}
+.confirm-actions{display:flex;gap:8px;justify-content:flex-end}
+.confirm-actions .btn{flex:1}
+
+
+/* HOME restaurada */
+.hostess-strip{background:rgba(95,125,110,.92);color:#fff}
+.hostess-strip-inner{display:flex;align-items:center;gap:14px;padding:10px 16px}
+.hostess-label{letter-spacing:.08em;opacity:.9}
+.hostess-exit-btn{padding:7px 16px;background:rgba(255,255,255,.12)}
+.home-wrap{max-width:980px;margin:0 auto;padding:34px 0 42px}
+.home-logo{display:block;width:min(340px,72vw);margin:0 auto 22px}
+.home-title{font-size:2.15rem;text-align:center;letter-spacing:.14em;color:var(--sage-dark);margin-bottom:24px;font-weight:500}
+.home-active-card{background:#fff;border:2px dashed #d7e2da;border-radius:28px;padding:28px 22px;text-align:center;max-width:860px;margin:0 auto 26px}
+.home-active-card p{font-size:1.2rem;color:var(--text-mid);margin-bottom:8px}
+.home-active-link{font-size:1.15rem;font-weight:700;color:var(--sage-dark);text-decoration:underline;cursor:pointer}
+.home-cards{display:grid;grid-template-columns:repeat(2,1fr);gap:22px;max-width:860px;margin:0 auto}
+.home-card-btn{background:#fff;border:1px solid var(--border);border-radius:28px;padding:34px 20px;min-height:220px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;box-shadow:var(--sh);font-size:1rem;font-weight:700;color:var(--sage-dark)}
+.home-card-icon{font-size:3.2rem;line-height:1}
+.home-card-title{font-size:1.9rem;letter-spacing:.08em}
+.page-events-hero{padding-top:14px}
+.page-events-hero .page-title{font-size:3rem}
+.footer-brand{margin-top:auto;background:#0f2018;color:#fff;padding:18px 16px;text-align:center}
+.footer-brand strong{font-weight:700}
+@media(max-width:768px){
+  .hostess-strip-inner{padding:10px 14px;flex-wrap:wrap}
+  .home-wrap{padding:24px 0 30px}
+  .home-title{font-size:1.45rem;margin-bottom:18px}
+  .home-active-card{padding:22px 18px;border-radius:24px}
+  .home-active-card p{font-size:1rem}
+  .home-active-link{font-size:1rem}
+  .home-cards{gap:16px}
+  .home-card-btn{min-height:180px;padding:24px 16px;border-radius:22px}
+  .home-card-icon{font-size:2.8rem}
+  .home-card-title{font-size:1.15rem}
+}
+
+
+/* ── HOME / PROPORÇÃO ── */
+.home-wrap{
+  max-width:860px;
+  margin:0 auto;
+  padding:24px 16px 34px;
+}
+.home-logo{
+  width:min(240px,68vw);
+  height:auto;
+  display:block;
+  margin:0 auto 18px;
+}
+.home-title{
+  text-align:center;
+  font-size:1.05rem;
+  font-weight:700;
+  letter-spacing:.12em;
+  color:var(--sage-dark);
+  margin-bottom:18px;
+  text-transform:uppercase;
+}
+.home-card{
+  background:var(--white);
+  border:1px dashed var(--border);
+  border-radius:24px;
+  padding:22px 18px;
+  margin-bottom:18px;
+  box-shadow:var(--sh);
+}
+.home-card + .home-card{margin-top:12px}
+.home-card-title{
+  font-family:var(--font-d);
+  font-size:1.5rem;
+  color:var(--forest);
+  margin-bottom:12px;
+  text-align:center;
+}
+@media(max-width:900px){
+  .home-wrap{padding:20px 14px 30px}
+  .home-logo{width:min(210px,72vw);margin-bottom:16px}
+  .home-title{font-size:.95rem;letter-spacing:.1em}
+  .home-card{padding:18px 14px;border-radius:20px}
+}
+
+/* RESPONSIVIDADE */
+@media(max-width:1024px){
+  .page-title{font-size:1.8rem}
+  .card{padding:14px 12px}
+}
+@media(max-width:768px){
+  .app-header{padding:12px}
+  .header-logo-wrap{padding-right:14px}
+  .header-logo{height:34px}
+  .container{padding:0 12px}
+  .page-header-row{flex-direction:column;align-items:stretch}
+  .action-row{flex-wrap:wrap;justify-content:flex-start}
+  .page-title{font-size:1.6rem;margin-bottom:8px}
+  .card{padding:12px 10px;margin-bottom:12px}
+  table{font-size:.8rem}
+  th,td{padding:8px 10px}
+  .col-hide-sm{display:none}
+}
+@media(max-width:600px){
+  .page{padding-bottom:30px}
+  .app-header{padding:10px 8px;gap:10px}
+  .header-logo{height:28px}
+  .page-title{font-size:1.4rem}
+  .page-subtitle{font-size:.85rem}
+  .card{padding:12px 10px;margin-bottom:10px}
+  .btn{padding:7px 12px;font-size:.75rem}
+  table{font-size:.75rem}
+  th,td{padding:6px 8px}
+  .modal{max-width:95vw}
+  .stats-grid{gap:4px}
+  .filter-group{gap:3px}
+  .filter-btn{padding:5px 10px;font-size:.75rem}
+  .ci-btn{padding:5px 10px;font-size:.65rem}
+}
+
+/* Modo escuro (opcional - preparação futura) */
+@media(prefers-color-scheme:dark){
+  /* Preparação para dark mode - não ativar por enquanto */
+}
+
+/* ── AJUSTE FINO MOBILE COMPACTO ── */
+.home-wrap{max-width:760px;padding:16px 12px 24px}
+.home-logo{width:min(160px,46vw)!important;margin:0 auto 12px!important}
+.home-title{font-size:.8rem!important;letter-spacing:.09em!important;margin-bottom:12px!important}
+.home-card{padding:14px 12px!important;border-radius:20px!important;margin-bottom:14px!important}
+.home-card .event-active,.home-card .event-link{font-size:1rem!important;line-height:1.35!important}
+.home-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.home-grid .home-box{min-height:150px!important;padding:14px 10px!important;border-radius:18px!important}
+.home-grid .home-box .icon{font-size:2rem!important;margin-bottom:8px!important}
+.home-grid .home-box .label{font-size:1.05rem!important;line-height:1.1!important;letter-spacing:.03em!important}
+.footer strong{font-size:.78rem!important;line-height:1.35!important;display:block;text-align:center}
+.app-footer{padding:16px 12px!important}
+
+@media (max-width: 768px){
+  .app-header{min-height:48px!important;padding:6px 10px!important;gap:8px!important}
+  .header-logo{height:20px!important}
+  .header-logo-wrap{padding-right:8px!important}
+  .header-nav{gap:10px!important;padding-top:2px!important}
+  .nav-tab{font-size:.68rem!important;padding:6px 0!important}
+  .login-btn{padding:4px 10px!important;font-size:.68rem!important}
+  .hostess-bar{padding:6px 10px!important;font-size:.72rem!important}
+  .home-wrap{padding:14px 10px 20px!important}
+  .home-logo{width:min(138px,42vw)!important;margin-bottom:10px!important}
+  .home-title{font-size:.72rem!important;margin-bottom:10px!important}
+  .home-card{padding:12px 10px!important;border-radius:18px!important}
+  .home-grid{gap:10px!important}
+  .home-grid .home-box{min-height:128px!important;padding:12px 8px!important;border-radius:16px!important}
+  .home-grid .home-box .icon{font-size:1.7rem!important;margin-bottom:6px!important}
+  .home-grid .home-box .label{font-size:.82rem!important;line-height:1.05!important}
+  .footer strong{font-size:.7rem!important}
+  .app-footer{padding:14px 10px!important}
+}
+
+
+/* ── AJUSTE FINAL MENU + CARDS ── */
+.header-nav a,
+.nav-tab{
+  font-size: 0.95rem !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.04em !important;
+}
+
+.home-grid .home-box{
+  min-height: 95px !important;
+  padding: 10px 8px !important;
+  border-radius: 16px !important;
+}
+
+.home-grid .home-box .icon{
+  font-size: 1.4rem !important;
+  margin-bottom: 6px !important;
+}
+
+.home-grid .home-box .label{
+  font-size: 0.8rem !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.03em !important;
+  line-height: 1.1 !important;
+}
+
+@media (max-width: 768px){
+  .home-grid{
+    gap: 10px !important;
+  }
+
+  .home-grid .home-box{
+    min-height: 90px !important;
+  }
+
+  .home-grid .home-box .label{
+    font-size: 0.75rem !important;
+  }
+
+  .home-grid .home-box .icon{
+    font-size: 1.3rem !important;
+  }
+
+  .header-nav a,
+  .nav-tab{
+    font-size: 0.95rem !important;
+  }
+}
+
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="app-header">
+  <div class="header-logo-wrap" onclick="showPage('home')">
+    <img src="./logo-branco.png" alt="Inspire" class="header-logo">
+  </div>
+  <nav class="header-nav">
+    <button class="nav-tab active" onclick="showPage('home')" data-page="home">Home</button>
+    <button class="nav-tab" onclick="showPage('events')" data-page="events">Eventos</button>
+    <button class="nav-tab" onclick="showPage('guests')" data-page="guests">Convidados & Check-in</button>
+    <button class="nav-tab" onclick="showPage('rsvp')" data-page="rsvp">RSVP</button>
+    <button class="nav-tab" onclick="showPage('report')" data-page="report">Relatórios</button>
+    <button class="nav-tab" onclick="showPage('settings')" data-page="settings">Config</button>
+  </nav>
+  <div class="login-area">
+    <span class="logged-in" id="logged-in-name" style="display:none"></span>
+    <button class="login-btn" onclick="openModal('modal-login')" id="login-btn">Entrar</button>
+  </div>
+</div>
+<div class="hostess-strip" id="hostess-strip" style="display:none">
+  <div class="container hostess-strip-inner">
+    <span class="hostess-label">HOSTESS</span>
+    <strong id="hostess-strip-name">—</strong>
+    <button class="login-btn hostess-exit-btn" onclick="Receptionist.logout()">Sair</button>
+  </div>
+</div>
+
+<!-- HOME -->
+<div class="page active" id="page-home">
+  <div class="container home-wrap">
+    <img src="./logo-verde.png" alt="Inspire" class="home-logo">
+    <div class="home-title">SISTEMA DE GESTÃO DE EVENTOS</div>
+    <div class="home-active-card">
+      <p id="home-active-event">Nenhum evento ativo.</p>
+      <div class="home-active-link" onclick="showPage('events')">Criar ou selecionar um evento →</div>
+    </div>
+    <div class="home-cards">
+      <button class="home-card-btn" onclick="showPage('events')">
+        <div class="home-card-icon">📅</div>
+        <div class="home-card-title">EVENTOS</div>
+      </button>
+      <button class="home-card-btn" onclick="showPage('guests')">
+        <div class="home-card-icon">👥</div>
+        <div class="home-card-title">CONVIDADOS</div>
+      </button>
+      <button class="home-card-btn" onclick="showPage('guests')">
+        <div class="home-card-icon">✓</div>
+        <div class="home-card-title">CHECK-IN</div>
+      </button>
+      <button class="home-card-btn" onclick="showPage('report')">
+        <div class="home-card-icon">📊</div>
+        <div class="home-card-title">RELATÓRIO</div>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- EVENTOS -->
+<div class="page" id="page-events">
+  <div class="container page-events-hero">
+    <div class="page-header-row">
+      <div>
+        <h1 class="page-title">Gestão de <em>Eventos</em></h1>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:22px">
+      <div class="card-head">+ Novo Evento</div>
+      <div class="card-body">
+        <div style="display:grid;grid-template-columns:1fr;gap:14px">
+          <div><label style="font-size:.9rem;font-weight:600">Nome do Evento *</label><input type="text" id="new-event-name" placeholder="Ex: Casamento Ana & Rafael" style="width:100%;margin-top:8px;padding:14px 16px;border:1px solid var(--border);border-radius:var(--r-sm)"></div>
+          <div><label style="font-size:.9rem;font-weight:600">Data *</label><input type="date" id="new-event-date" style="width:100%;margin-top:8px;padding:14px 16px;border:1px solid var(--border);border-radius:var(--r-sm)"></div>
+          <div><label style="font-size:.9rem;font-weight:600">Horário</label><input type="text" id="new-event-time" placeholder="" style="width:100%;margin-top:8px;padding:14px 16px;border:1px solid var(--border);border-radius:var(--r-sm)"></div>
+          <div><label style="font-size:.9rem;font-weight:600">Local / Espaço</label><input type="text" id="new-event-location" placeholder="Ex: Espaço Villa Lobos, SP" style="width:100%;margin-top:8px;padding:14px 16px;border:1px solid var(--border);border-radius:var(--r-sm)"></div>
+          <div><label style="font-size:.9rem;font-weight:600">Cliente / Contratante</label><input type="text" id="new-event-client" placeholder="Nome do cliente" style="width:100%;margin-top:8px;padding:14px 16px;border:1px solid var(--border);border-radius:var(--r-sm)"></div>
+          <label style="font-size:.9rem;font-weight:600"><input type="checkbox" id="new-event-use-rsvp"> Usar RSVP para este evento</label>
+          <div><button class="btn btn-primary" onclick="Events.createNew()">Criar Evento</button></div>
+        </div>
+      </div>
+    </div>
+    <h2 style="font-size:1.25rem;letter-spacing:.14em;color:var(--sage-dark);margin-bottom:14px">EVENTOS CADASTRADOS</h2>
+    <div id="events-list"></div>
+    <div class="reset-area">
+      <button class="btn btn-outline" onclick="App.clearLocalData()">⟳ Limpar todos os dados</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONVIDADOS & CHECK-IN UNIFICADO -->
+<div class="page" id="page-guests">
+  <div class="container">
+    <div class="page-header-row">
+      <div>
+        <h1 class="page-title">Convidados & <em>Check-in</em></h1>
+        <p id="guests-event-label" class="page-subtitle">Selecione um evento</p>
+      </div>
+      <div class="action-row">
+        <button class="btn btn-outline" onclick="openModal('modal-import')">⬆ Importar</button>
+        <button class="btn btn-primary" onclick="Guests.exportXLSX()">⬇ Exportar</button>
+      </div>
+    </div>
+
+    <!-- LAYOUT UNIFICADO -->
+    <div class="unified-layout" id="unified-guests-wrap" style="display:none">
+      <!-- ESQUERDA: Câmera + Busca Manual -->
+      <div class="unified-left">
+        <!-- Feedback -->
+        <div class="feedback-card idle" id="feedback">
+          <div class="fb-icon">—</div>
+          <div class="fb-name" id="fb-name">Pronto</div>
+          <div class="fb-msg" id="fb-msg">Sistema aguardando ação</div>
+        </div>
+
+        <!-- Câmera QR -->
+        <div class="card">
+          <div class="card-head">📷 QR Code</div>
+          <div id="qr-reader"></div>
+          <div class="card-body" style="padding:10px 12px">
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn btn-primary" id="btn-cam-start" onclick="Camera.start()">▶ Iniciar Câmera</button>
+              <button class="btn btn-outline" id="btn-cam-stop" onclick="Camera.stop()" style="display:none">⏹ Parar</button>
+            </div>
+            <p class="cam-hint">Funciona em HTTPS (link Netlify) ✓</p>
+          </div>
+        </div>
+
+        <!-- Busca Manual (ACIMA) -->
+        <div class="card manual-section">
+          <div class="card-head">🔍 Busca Manual</div>
+          <div class="card-body">
+            <div class="manual-row">
+              <input id="manual-input" class="manual-input" placeholder="Nome do convidado..."
+                oninput="Guests.onSearch(this.value)"
+                onkeypress="if(event.key==='Enter')Guests.doManual()">
+              <button class="btn btn-primary" onclick="Guests.doManual()">Check-in</button>
+            </div>
+            <div id="search-results"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- DIREITA: Lista de Convidados -->
+      <div class="unified-right">
+        <div class="card" style="display:flex;flex-direction:column;min-height:400px">
+          <div class="card-head">
+            <span>Lista de Convidados</span>
+            <span class="badge-count" id="guests-count">0</span>
+          </div>
+          
+          <!-- Filtro -->
+          <div style="padding:10px;flex-shrink:0;border-bottom:1px solid var(--border)">
+            <input class="search-box" style="width:100%;margin-bottom:8px" placeholder="🔍 Filtrar..." oninput="Guests.filterList(this.value)">
+            <div class="filter-group">
+              <button class="filter-btn active" onclick="Guests.setFilter('todos',this)">Todos</button>
+              <button class="filter-btn" onclick="Guests.setFilter('presente',this)">Presentes</button>
+              <button class="filter-btn" onclick="Guests.setFilter('pendente',this)">Pendentes</button>
+            </div>
+          </div>
+
+          <!-- Lista -->
+          <div class="checkin-list" id="guests-list"><div class="empty-state">Selecione um evento.</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="no-guests" class="empty-state">Selecione um evento na aba <strong>Eventos</strong>.</div>
+  </div>
+</div>
+
+<!-- RSVP -->
+<div class="page" id="page-rsvp">
+  <div class="container">
+    <div class="page-header-row">
+      <div>
+        <h1 class="page-title">RSVP <em>do Evento</em></h1>
+        <p id="rsvp-event-label" class="page-subtitle">Selecione um evento</p>
+      </div>
+      <div class="action-row">
+        <button class="btn btn-primary" onclick="RSVP.exportXLSX()">⬇ Exportar RSVP</button>
+      </div>
+    </div>
+
+    <div id="no-event-rsvp" class="empty-state">Selecione um evento na aba <strong>Eventos</strong>.</div>
+    <div id="rsvp-table-wrap" style="display:none">
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:18px">
+        <div class="stat-card"><div class="stat-val" id="rsvp-total">—</div><div class="stat-lbl">Total</div></div>
+        <div class="stat-card sage"><div class="stat-val" id="rsvp-conf">—</div><div class="stat-lbl">Confirmados</div></div>
+        <div class="stat-card warn"><div class="stat-val" id="rsvp-wait">—</div><div class="stat-lbl">Aguardando</div></div>
+        <div class="stat-card"><div class="stat-val" id="rsvp-recus">—</div><div class="stat-lbl">Recusados</div></div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Nome</th><th>Telefone</th><th class="col-hide-sm">Acomp.</th><th>Status RSVP</th><th class="col-hide-sm">Observações</th><th>Ações</th></tr></thead>
+          <tbody id="rsvp-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- RELATÓRIO -->
+<div class="page" id="page-report">
+  <div class="container">
+    <div class="page-header-row">
+      <div>
+        <h1 class="page-title">Relatórios <em>do Evento</em></h1>
+        <p id="report-event-label" class="page-subtitle">—</p>
+      </div>
+      <div class="action-row">
+        <button class="btn btn-outline" onclick="openDashboard()">👁 Dashboard ao vivo</button>
+      </div>
+    </div>
+    <div id="no-event-report" class="empty-state">Selecione um evento na aba <strong>Eventos</strong>.</div>
+    <div id="report-table-wrap" style="display:none">
+
+      <!-- ABAS INTERNAS DO RELATÓRIO -->
+      <div style="display:flex;gap:4px;margin-bottom:18px;border-bottom:2px solid var(--border);padding-bottom:0">
+        <button class="report-tab-btn active" id="rtab-rsvp" onclick="Report.switchTab('rsvp')" style="padding:9px 18px;border:none;background:none;font-family:var(--font-b);font-size:.88rem;font-weight:600;color:var(--sage-dark);border-bottom:2px solid var(--sage-dark);margin-bottom:-2px;cursor:pointer">📋 RSVP</button>
+        <button class="report-tab-btn" id="rtab-checkin" onclick="Report.switchTab('checkin')" style="padding:9px 18px;border:none;background:none;font-family:var(--font-b);font-size:.88rem;font-weight:500;color:var(--text-light);cursor:pointer">✓ Check-in</button>
+      </div>
+
+      <!-- PAINEL RSVP -->
+      <div id="report-panel-rsvp">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+          <button class="btn btn-primary" onclick="Report.exportRsvpXLSX()">⬇ Exportar RSVP</button>
+        </div>
+        <div class="stats-grid" style="margin-bottom:14px" id="report-rsvp-stats"></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Nome</th><th>Telefone</th><th class="col-hide-sm">Acomp.</th><th>PAX</th><th class="col-hide-sm">Mesa</th><th>Status RSVP</th></tr></thead>
+            <tbody id="report-rsvp-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- PAINEL CHECK-IN -->
+      <div id="report-panel-checkin" style="display:none">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+          <button class="btn btn-primary" onclick="Report.exportCheckinXLSX()">⬇ Exportar Check-in</button>
+        </div>
+        <div class="stats-grid" style="margin-bottom:14px" id="report-checkin-stats"></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Nome</th><th class="col-hide-sm">Mesa</th><th>Status RSVP</th><th>Check-in (hora)</th><th>Presentes (PP)</th><th>Checado por</th></tr></thead>
+            <tbody id="report-checkin-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- SETTINGS -->
+<div class="page" id="page-settings">
+  <div class="container">
+    <div class="page-header-row">
+      <div>
+        <h1 class="page-title">Configurações</h1>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head">Sincronização</div>
+      <div class="card-body">
+        <p style="margin-bottom:10px">Status: <strong id="sync-status">Verificando...</strong></p>
+        <button class="btn btn-outline" onclick="App.checkOnlineStatus()">🔄 Verificar Conexão</button>
+      </div>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <div class="card-head">Cache & Armazenamento</div>
+      <div class="card-body">
+        <p style="font-size:.9rem;color:var(--text-light);margin-bottom:10px">Dados salvos localmente para operação offline.</p>
+        <button class="btn btn-outline" onclick="App.clearLocalData()">🗑 Limpar Cache</button>
+      </div>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <div class="card-head">Backup Google Drive</div>
+      <div class="card-body">
+        <p style="font-size:.9rem;color:var(--text-light);margin-bottom:10px">Crie backups automáticos e manuais do evento ativo.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <button class="btn btn-primary" id="backup-btn" onclick="Backup.doBackupNow()">💾 Backup Agora</button>
+          <span id="backup-status" style="font-size:.82rem;color:var(--text-light)"></span>
+        </div>
+        <div id="backup-last-time" style="font-size:.78rem;color:var(--text-light);margin-top:8px"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═════════════════════════════════════════════════════════
+     MODAIS
+     ═════════════════════════════════════════════════════════ -->
+
+<!-- MODAL: Login -->
+<div class="modal-overlay" id="modal-login">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-login')">✕</button>
+    <h2 class="modal-title">Entrar</h2>
+    <div style="margin-bottom:16px">
+      <label style="font-size:.9rem;font-weight:600;color:var(--forest)">Receptionist / HOSTESSS</label>
+      <input type="text" id="login-name" placeholder="Seu nome" style="width:100%;margin-top:8px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--r-sm);font-size:1rem;">
+    </div>
+    <div style="margin-bottom:16px">
+      <label style="font-size:.9rem;font-weight:600;color:var(--forest)">Senha</label>
+      <input type="password" id="login-pass" placeholder="Senha" style="width:100%;margin-top:8px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--r-sm);font-size:1rem;">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('modal-login')">Cancelar</button>
+      <button class="btn btn-primary" onclick="Receptionist.login()">Entrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Novo Evento -->
+<div class="modal-overlay" id="modal-new-event">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-new-event')">✕</button>
+    <h2 class="modal-title">Novo <em>Evento</em></h2>
+    <div style="margin-bottom:14px">
+      <label style="font-size:.9rem;font-weight:600">Nome do Evento</label>
+      <input type="text" id="new-event-name" placeholder="Ex: Casamento de João & Maria" style="width:100%;margin-top:6px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--r-sm)">
+    </div>
+    <div style="margin-bottom:14px">
+      <label style="font-size:.9rem;font-weight:600">Data</label>
+      <input type="date" id="new-event-date" style="width:100%;margin-top:6px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--r-sm)">
+    </div>
+    <div style="margin-bottom:14px">
+      <label style="font-size:.9rem;font-weight:600">
+        <input type="checkbox" id="new-event-use-rsvp"> Usar RSVP para este evento
+      </label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('modal-new-event')">Cancelar</button>
+      <button class="btn btn-primary" onclick="Events.createNew()">Criar Evento</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Check-in -->
+<div class="modal-overlay" id="modal-checkin">
+  <div class="modal">
+    <button class="modal-close" onclick="closeCheckinModal()">✕</button>
+    <h2 class="modal-title">Confirmar <em>Check-in</em></h2>
+    <div id="ci-modal-info" style="margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--border);font-size:.95rem;line-height:1.6"></div>
+    <div style="margin-bottom:14px">
+      <label style="font-size:.9rem;font-weight:600;color:var(--forest)">Quantos compareceram?</label>
+      <input type="number" id="ci-presentes" placeholder="1" min="1" max="10" style="width:100%;margin-top:6px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--r-sm)">
+    </div>
+    <div style="margin-bottom:16px">
+      <label style="font-size:.9rem;font-weight:600;color:var(--forest)">Acompanhante (nome extra)</label>
+      <input type="text" id="ci-extra-nome" placeholder="Opcional" style="width:100%;margin-top:6px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--r-sm)">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeCheckinModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="Guests.confirmCheckin()">✓ Confirmar Check-in</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Editar Evento -->
+<div class="modal-overlay" id="modal-edit-event">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-edit-event')">✕</button>
+    <h2 class="modal-title">Editar <em>Evento</em></h2>
+    <div style="margin-bottom:14px">
+      <label style="font-size:.9rem;font-weight:600">Nome do Evento</label>
+      <input type="text" id="edit-event-name" style="width:100%;margin-top:6px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--r-sm)">
+    </div>
+    <div style="margin-bottom:14px">
+      <label style="font-size:.9rem;font-weight:600">Data</label>
+      <input type="date" id="edit-event-date" style="width:100%;margin-top:6px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--r-sm)">
+    </div>
+    <div style="margin-bottom:14px">
+      <label style="font-size:.9rem;font-weight:600">
+        <input type="checkbox" id="edit-event-use-rsvp"> Usar RSVP
+      </label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('modal-edit-event')">Cancelar</button>
+      <button class="btn btn-danger" onclick="Events.deleteEvent()" style="margin-right:auto">🗑 Deletar</button>
+      <button class="btn btn-primary" onclick="Events.saveEdit()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Importar Lista -->
+<div class="modal-overlay" id="modal-import">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-import')">✕</button>
+    <h2 class="modal-title">Importar <em>Lista</em></h2>
+    <p style="font-size:.88rem;color:var(--text-mid);margin-bottom:16px">Escolha o tipo de importação antes de selecionar o arquivo.</p>
+    <div style="margin-bottom:14px">
+      <label style="font-size:.9rem;font-weight:600;display:block;margin-bottom:8px">Tipo de Importação:</label>
+      <select id="import-type" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:var(--r-sm);font-size:.95rem">
+        <option value="guests">Convidados (RSVP + Check-in)</option>
+        <option value="rsvp">Apenas RSVP</option>
+      </select>
+    </div>
+    <div style="margin-bottom:16px">
+      <input type="file" id="import-file" accept=".xlsx,.xls,.csv" style="width:100%;padding:8px 4px">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('modal-import')">Cancelar</button>
+      <button class="btn btn-primary" onclick="Guests.importXLSX()">Importar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Confirmação -->
+<div class="confirm-overlay" id="confirm-modal">
+  <div class="confirm-modal">
+    <h3 class="confirm-title" id="confirm-title"></h3>
+    <p class="confirm-msg" id="confirm-msg"></p>
+    <div class="confirm-actions">
+      <button class="btn btn-outline" id="confirm-no" onclick="Confirm.cancel()">Cancelar</button>
+      <button class="btn btn-primary" id="confirm-yes" onclick="Confirm.confirm()">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- MODAL: Editar Convidado -->
+<div class="modal-overlay" id="modal-edit-guest">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-edit-guest')">✕</button>
+    <h2 class="modal-title">Editar <em>Convidado</em></h2>
+    <div style="display:grid;gap:12px">
+      <div>
+        <label style="font-size:.9rem;font-weight:600">Nome</label>
+        <input type="text" id="edit-guest-name" style="width:100%;margin-top:6px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--r-sm)">
+      </div>
+      <div>
+        <label style="font-size:.9rem;font-weight:600">Telefone</label>
+        <input type="text" id="edit-guest-phone" style="width:100%;margin-top:6px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--r-sm)">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <label style="font-size:.9rem;font-weight:600">Acompanhantes</label>
+          <input type="number" id="edit-guest-acomp" min="0" style="width:100%;margin-top:6px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--r-sm)">
+        </div>
+        <div>
+          <label style="font-size:.9rem;font-weight:600">Mesa</label>
+          <input type="text" id="edit-guest-table" style="width:100%;margin-top:6px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--r-sm)">
+        </div>
+      </div>
+      <div>
+        <label style="font-size:.9rem;font-weight:600">Status RSVP</label>
+        <select id="edit-guest-status" style="width:100%;margin-top:6px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--r-sm)">
+          <option value="aguardando">Aguardando</option>
+          <option value="confirmado">Confirmado</option>
+          <option value="recusado">Recusado</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:.9rem;font-weight:600">Observações</label>
+        <textarea id="edit-guest-obs" rows="3" style="width:100%;margin-top:6px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--r-sm)"></textarea>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('modal-edit-guest')">Cancelar</button>
+      <button class="btn btn-primary" onclick="Guests.saveGuestEdit()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<footer class="footer-brand"><strong>Inspire Consultoria e Produção de Eventos · Gestão Inteligente</strong></footer>
+
+<script>
+/**
+ * ═════════════════════════════════════════════════════════════
+ * INSPIRE — Sistema de Gestão de Eventos
+ * v10 — Responsivo + QR Individual + Dashboard Correto
+ * ═════════════════════════════════════════════════════════════
+ */
+
+/* ── FIREBASE INIT ── */
+const firebaseConfig={
+  apiKey:"AIzaSyDGl8-K4Hh6WyStKm_9pJxTSBYfGvvJAP0",
+  authDomain:"inspire-eventos.firebaseapp.com",
+  projectId:"inspire-eventos",
+  storageBucket:"inspire-eventos.appspot.com",
+  messagingSenderId:"1055449854646",
+  appId:"1:1055449854646:web:e29299e9fe23b14db0a7ac"
+};
+firebase.initializeApp(firebaseConfig);
+const db=firebase.firestore();
+
+/* ── UTILS ── */
+const norm=s=>s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+const esc=s=>s.replace(/[<>"&]/g,c=>({'<':'&lt;','>':'&gt;','"':'&quot;','&':'&amp;'}[c]));
+const fmtTime=t=>new Date(t).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+const fmtDate=t=>new Date(t).toLocaleDateString('pt-BR');
+const statusLabel=s=>{const map={'confirmado':'✓ Confirmado','aguardando':'⏳ Aguardando','recusado':'✕ Recusado'};return map[s]||s};
+const toast=(msg,type='')=>{const t=document.getElementById('toast');t.textContent=msg;t.className='toast show '+type;setTimeout(()=>t.classList.remove('show'),3000)};
+
+/* ── MODAIS ── */
+const openModal=id=>document.getElementById(id).classList.add('open');
+const closeModal=id=>document.getElementById(id).classList.remove('open');
+const closeCheckinModal=()=>closeModal('modal-checkin');
+const openDashboard=()=>window.open(`dashboard.html${App._activeId?`?event=${App._activeId}`:''}`,'_blank');
+
+/* ── NAVIGATION ── */
+const showPage=name=>{
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  const page=document.getElementById('page-'+name);
+  if(page)page.classList.add('active');
+  document.querySelectorAll('.nav-tab').forEach(n=>{
+    n.classList.toggle('active',n.dataset.page===name);
+  });
+  if(name==='guests')Guests.load();
+  else if(name==='rsvp')RSVP.load();
+  else if(name==='report')Report.load();
+  else if(name==='events')Events.load();
+  App.renderHome();
+  window.scrollTo({top:0,behavior:'instant'});
+};
+const toggleNav=()=>{};
+const closeNav=()=>{};
+
+/* ── APP ── */
+const App={
+  _activeId:null,
+  _activeEvent:null,
+  async init(){
+    navigator.serviceWorker.register('service-worker.js').catch(e=>console.warn('SW error:',e));
+    this.checkOnlineStatus();
+    setInterval(()=>this.checkOnlineStatus(),30000);
+    Receptionist._name=localStorage.getItem('hostess_name')||null;
+    if(Receptionist._name){document.getElementById('logged-in-name').textContent=Receptionist._name;document.getElementById('logged-in-name').style.display='inline';document.getElementById('login-btn').style.display='none';}
+    Events.load();
+    this.renderHome();
+  },
+  checkOnlineStatus(){
+    const online=navigator.onLine;
+    document.getElementById('sync-status').textContent=online?'🟢 Online':'🔴 Offline';
+  },
+  clearLocalData(){
+    if(confirm('Limpar cache local? Você terá que recarregar.')){
+      localStorage.clear();
+      indexedDB.deleteDatabase('inspire');
+      location.reload();
+    }
+  },
+  selectEvent(id){
+    this._activeId=id;
+    const evt=Events._all.find(e=>e.id===id);
+    this._activeEvent=evt;
+    Guests.load();
+    RSVP.load();
+    Report.load();
+    Events.load();
+    this.renderHome();
+  },
+  renderHome(){
+    const el=document.getElementById('home-active-event');
+    if(!el)return;
+    el.textContent=this._activeEvent?`Evento ativo: ${this._activeEvent.nome}`:'Nenhum evento ativo.';
+    const hostessBar=document.getElementById('hostess-strip');
+    if(hostessBar) hostessBar.style.display=Receptionist._name?'block':'none';
+    const hostessName=document.getElementById('hostess-strip-name');
+    if(hostessName) hostessName.textContent=Receptionist._name||'';
+  },
+  refreshHome(){
+    if(document.getElementById('page-guests').classList.contains('active'))Guests._renderList();
+    if(document.getElementById('page-report').classList.contains('active'))Report._syncGuests();
+  }
+};
+
+/* ── RECEPTIONIST (LOGIN) ── */
+const Receptionist={
+  _name:null,
+  getName(){return this._name||'Anônimo'},
+  logout(){
+    this._name=null;
+    localStorage.removeItem('hostess_name');
+    document.getElementById('logged-in-name').style.display='none';
+    document.getElementById('login-btn').style.display='inline-flex';
+    App.renderHome();
+    toast('Sessão encerrada');
+  },
+  login(){
+    const name=(document.getElementById('login-name').value||'').trim();
+    const pass=document.getElementById('login-pass').value;
+    if(!name){toast('Nome obrigatório','err');return;}
+    if(pass!=='inspire2026'){toast('Senha incorreta','err');return;}
+    this._name=name;
+    document.getElementById('logged-in-name').textContent=name;
+    document.getElementById('logged-in-name').style.display='inline';
+    document.getElementById('login-btn').style.display='none';
+    closeModal('modal-login');
+    toast('Bem-vindo, '+name+'!','ok');
+  }
+};
+
+/* ── EVENTS ── */
+const Events={
+  _all:[],
+  _unsub:null,
+  async load(){
+    if(this._unsub)this._unsub();
+    this._unsub=db.collection('events').onSnapshot(snap=>{
+      this._all=snap.docs.map(d=>({...d.data(),id:d.id}));
+      this._render();
+    });
+  },
+  _render(){
+    const html=this._all.length?
+      this._all.map(e=>`<div class="event-item">
+        <div class="event-info">
+          <div class="event-name">${esc(e.nome)}</div>
+          <div class="event-meta">${fmtDate(e.data)}</div>
+        </div>
+        <div class="event-item-actions">
+          <button class="btn btn-outline" onclick="App.selectEvent('${e.id}')">Usar →</button>
+          <button class="icon-btn" onclick="Events.editEvent('${e.id}')">✎</button>
+        </div>
+      </div>`).join(''):
+      '<div class="empty-state">Nenhum evento. Crie um novo.</div>';
+    document.getElementById('events-list').innerHTML=html;
+  },
+  createNew(){
+    const nome=(document.getElementById('new-event-name').value||'').trim();
+    const data=new Date(document.getElementById('new-event-date').value).getTime();
+    const useRsvp=document.getElementById('new-event-use-rsvp').checked;
+    if(!nome||!data){toast('Preencha todos os campos','err');return;}
+    db.collection('events').add({nome,data,useRsvp:useRsvp||false,createdAt:Date.now()})
+      .then(()=>{
+        closeModal('modal-new-event');
+        document.getElementById('new-event-name').value='';
+        document.getElementById('new-event-date').value='';
+        document.getElementById('new-event-use-rsvp').checked=false;
+        toast('Evento criado!','ok');
+      })
+      .catch(err=>toast('Erro: '+err.message,'err'));
+  },
+  editEvent(id){
+    const evt=this._all.find(e=>e.id===id);
+    if(!evt)return;
+    document.getElementById('edit-event-name').value=evt.nome;
+    document.getElementById('edit-event-date').value=new Date(evt.data).toISOString().split('T')[0];
+    document.getElementById('edit-event-use-rsvp').checked=evt.useRsvp||false;
+    openModal('modal-edit-event');
+  },
+  saveEdit(){
+    const id=App._activeId;
+    const nome=document.getElementById('edit-event-name').value.trim();
+    const data=new Date(document.getElementById('edit-event-date').value).getTime();
+    const useRsvp=document.getElementById('edit-event-use-rsvp').checked;
+    if(!nome||!data){toast('Preencha todos os campos','err');return;}
+    db.collection('events').doc(id).update({nome,data,useRsvp:useRsvp||false})
+      .then(()=>{
+        closeModal('modal-edit-event');
+        toast('Evento atualizado!','ok');
+        App._activeEvent={id,nome,data,useRsvp};
+      })
+      .catch(err=>toast('Erro: '+err.message,'err'));
+  },
+  deleteEvent(){
+    if(!confirm('Deletar evento e todos os dados?'))return;
+    db.collection('events').doc(App._activeId).delete()
+      .then(()=>{
+        App._activeId=null;
+        App._activeEvent=null;
+        closeModal('modal-edit-event');
+        toast('Evento deletado','ok');
+        showPage('home');
+      })
+      .catch(err=>toast('Erro: '+err.message,'err'));
+  }
+};
+
+
+const genQrToken=()=>((window.crypto&&crypto.randomUUID)?crypto.randomUUID():`qr-${Date.now()}-${Math.random().toString(36).slice(2,10)}`);
+const ensureGuestQrData=async(eventId,guestId,guest)=>{
+  if(!eventId||!guestId||!guest)return guest;
+  if(guest.qr_token&&guest.qr_code)return guest;
+  const token=guest.qr_token||genQrToken();
+  let qrCode=guest.qr_code||'';
+  try{
+    if(window.QRCode&&QRCode.toDataURL){
+      qrCode=await QRCode.toDataURL(token,{width:256,margin:1});
+    }
+  }catch(err){console.warn('QR generate error',err);}
+  const payload={qr_token:token,qr_code:qrCode||''};
+  db.collection('events').doc(eventId).collection('guests').doc(guestId).update(payload).catch(()=>{});
+  return {...guest,...payload};
+};
+
+/* ── GUESTS (CONVIDADOS + CHECK-IN UNIFICADO) ── */
+const Guests={
+  _all:[],
+  _sel:null,
+  _pending:null,
+  _unsub:null,
+  _filter:'todos',
+  _search:'',
+  load(){
+    const label=document.getElementById('guests-event-label');
+    if(!App._activeId){
+      document.getElementById('unified-guests-wrap').style.display='none';
+      document.getElementById('no-guests').style.display='block';
+      if(label)label.textContent='Nenhum evento selecionado';
+      return;
+    }
+    document.getElementById('unified-guests-wrap').style.display='grid';
+    document.getElementById('no-guests').style.display='none';
+    if(label)label.textContent=App._activeEvent?.nome||'';
+    if(this._unsub)this._unsub();
+    this._unsub=db.collection('events').doc(App._activeId).collection('guests').onSnapshot(snap=>{
+      this._all=snap.docs.map(d=>({...d.data(),id:d.id}));
+      this._all.forEach(g=>{ if(!g.qr_token||!g.qr_code) ensureGuestQrData(App._activeId,g.id,g); });
+      this._renderList();
+    });
+  },
+  _renderList(){
+    let list=this._all;
+    if(this._filter==='presente')list=list.filter(g=>g.checkedIn);
+    else if(this._filter==='pendente')list=list.filter(g=>!g.checkedIn);
+    if(this._search){
+      const q=norm(this._search);
+      list=list.filter(g=>norm(g.nome).includes(q));
+    }
+    const sorted=list.slice().sort((a,b)=>{
+      if(a.checkedIn&&!b.checkedIn)return-1;
+      if(!a.checkedIn&&b.checkedIn)return 1;
+      return norm(a.nome).localeCompare(norm(b.nome));
+    });
+    const container=document.getElementById('guests-list');
+    document.getElementById('guests-count').textContent=this._all.length;
+    if(!sorted.length){container.innerHTML='<div class="empty-state">Nenhum resultado.</div>';return;}
+    container.innerHTML=sorted.map(g=>{
+      const pax=1+(g.acompanhantes||0);
+      const pp=g.checkedIn?(g.presentesNaEntrada||1):null;
+      return `<div class="ci-guest-item${g.checkedIn?' presente':''}">
+        <div class="ci-dot"></div>
+        <div class="ci-info">
+          <div class="ci-name">${esc(g.nome)}</div>
+          <div class="ci-meta">PAX ${pax}${g.checkedIn?` · PP ${pp} · ${fmtTime(g.checkinTime)} · ${esc(g.checkedBy||'')}`:(g.acompanhantes?` · +${g.acompanhantes} acomp`:'')}</div>
+        </div>
+        <div class="ci-actions">
+          <button class="icon-btn" title="Editar convidado" onclick="Guests.openEditGuest('${g.id}')">✎</button>
+          <button class="ci-btn" onclick="Guests.openCheckinModal('${g.id}')">${g.checkedIn?'✓':'Check-in'}</button>
+        </div>
+      </div>`;
+    }).join('');
+  },
+  setFilter(f,btn){
+    this._filter=f;
+    document.querySelectorAll('#page-guests .filter-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    this._renderList();
+  },
+  filterList(q){
+    this._search=q;
+    this._renderList();
+  },
+  onSearch(q){
+    if(!q){document.getElementById('search-results').innerHTML='';return;}
+    const found=this._all.filter(g=>norm(g.nome).includes(norm(q)));
+    document.getElementById('search-results').innerHTML=found.length?
+      '<div class="search-results-list">'+
+      found.map(g=>
+        `<div class="search-result-item" onclick="Guests.selectGuest('${g.id}')">
+          <div><div class="sri-name">${esc(g.nome)}</div>
+          <div class="sri-meta">${g.checkedIn?'✓ Presente':statusLabel(g.status)}${g.acompanhantes?' · +'+g.acompanhantes:''}</div></div>
+          <span style="color:var(--sage)">→</span>
+        </div>`).join('')+'</div>':'';
+    if(found.length===1)this._sel=found[0];
+  },
+  selectGuest(id){
+    const g=this._all.find(x=>x.id===id);
+    if(g){
+      this._sel=g;
+      document.getElementById('manual-input').value=g.nome;
+      document.getElementById('search-results').innerHTML='';
+    }
+  },
+  doManual(){
+    if(this._sel){
+      this.openCheckinModal(this._sel.id);
+      document.getElementById('manual-input').value='';
+      document.getElementById('search-results').innerHTML='';
+      this._sel=null;
+      return;
+    }
+    const q=(document.getElementById('manual-input').value||'').trim();
+    if(!q)return;
+    const found=this._all.filter(g=>norm(g.nome).includes(norm(q)));
+    if(!found.length){this._fb('error','✕',q,'Convidado não encontrado.');return;}
+    if(found.length===1){
+      this.openCheckinModal(found[0].id);
+      document.getElementById('manual-input').value='';
+      document.getElementById('search-results').innerHTML='';
+    }else this.onSearch(q);
+  },
+  openCheckinModal(guestId){
+    const g=this._all.find(x=>x.id===guestId);
+    if(!g)return;
+    if(g.checkedIn){
+      this._fb('warn','⚠',g.nome,'Já realizou check-in às '+fmtTime(g.checkinTime));
+      return;
+    }
+    this._pending=g;
+    const total=1+(g.acompanhantes||0);
+    document.getElementById('ci-modal-info').innerHTML=
+      `<strong style="font-family:var(--font-d);font-size:1.2rem">${esc(g.nome)}</strong><br>`+
+      (g.mesa?`🪑 ${esc(g.mesa)}&nbsp;&nbsp;`:'')+
+      `Status: <strong>${statusLabel(g.status)}</strong><br>`+
+      `PAX (convidados do convite): <strong>${total}</strong>`;
+    document.getElementById('ci-presentes').value=total;
+    document.getElementById('ci-extra-nome').value='';
+    openModal('modal-checkin');
+    setTimeout(()=>document.getElementById('ci-presentes').focus(),150);
+  },
+  confirmCheckin(){
+    const g=this._pending;
+    if(!g)return;
+    const presentes=parseInt(document.getElementById('ci-presentes').value)||1;
+    const extraNome=(document.getElementById('ci-extra-nome').value||'').trim();
+    const now=Date.now();
+    const checkedBy=Receptionist.getName();
+    closeCheckinModal();
+    db.collection('events').doc(App._activeId).collection('guests').doc(g.id)
+      .update({checkedIn:true,checkinTime:now,presentesNaEntrada:presentes,extraNome,checkedBy})
+      .then(()=>{
+        this._fb('success','✓',g.nome,`PP: ${presentes} pessoa${presentes>1?'s':''} · PAX: ${1+(g.acompanhantes||0)}`+(extraNome?` · Acomp: ${extraNome}`:''));
+        if(window.Backup)Backup.registerEvent('checkin');
+        App.refreshHome();
+      })
+      .catch(err=>{toast('Erro no check-in: '+err.message,'err');});
+  },
+  exportXLSX(){
+    if(!App._activeId){toast('Selecione um evento','err');return;}
+    const data=this._all.map(g=>({
+      'Nome':g.nome,
+      'Telefone':g.telefone||'',
+      'Acompanhantes':g.acompanhantes||0,
+      'PAX':1+(g.acompanhantes||0),
+      'Mesa':g.mesa||'',
+      'Status RSVP':statusLabel(g.status),
+      'Check-in':'✓',
+      'Presentes (PP)':g.checkedIn?g.presentesNaEntrada:'-',
+      'Horário':g.checkedIn?fmtTime(g.checkinTime):'-',
+      'HOSTESSS':g.checkedBy||''
+    }));
+    const ws=XLSX.utils.json_to_sheet(data);
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,'Convidados');
+    XLSX.writeFile(wb,`Convidados_${App._activeEvent.nome}_${new Date().toISOString().split('T')[0]}.xlsx`);
+  },
+  importXLSX(){
+    const file=document.getElementById('import-file').files[0];
+    if(!file){toast('Selecione um arquivo','err');return;}
+    if(!App._activeId){toast('Selecione um evento primeiro','err');return;}
+    const reader=new FileReader();
+    reader.onload=e=>{
+      try{
+        const data=new Uint8Array(e.target.result);
+        const wb=XLSX.read(data,{type:'array'});
+        const ws=wb.Sheets[wb.SheetNames[0]];
+        const rows=XLSX.utils.sheet_to_json(ws);
+        if(!rows.length){toast('Nenhuma linha encontrada','err');return;}
+        let count=0;
+        rows.forEach(row=>{
+          if(!row['Nome']||!row['Nome'].trim())return;
+          db.collection('events').doc(App._activeId).collection('guests').add({
+            nome:(row['Nome']||'').trim(),
+            telefone:(row['Telefone']||'').trim(),
+            mesa:(row['Mesa']||'').trim(),
+            status:(row['Status RSVP']||'aguardando').toLowerCase().includes('confirmado')?'confirmado':'aguardando',
+            acompanhantes:parseInt(row['Acompanhantes'])||0,
+            checkedIn:false,
+            checkinTime:null,
+            presentesNaEntrada:0,
+            extraNome:'',
+            checkedBy:'',
+            qr_token:genQrToken(),
+            qr_code:'' 
+          }).then(()=>count++).catch(err=>console.error(err));
+        });
+        setTimeout(()=>{
+          toast(`${count} convidados importados!`,'ok');
+          closeModal('modal-import');
+          document.getElementById('import-file').value='';
+        },1000);
+      }catch(err){
+        toast('Erro ao ler arquivo: '+err.message,'err');
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  },
+  _fb(type,icon,name,msg){
+    const fb=document.getElementById('feedback');
+    fb.className='feedback-card '+type;
+    fb.querySelector('.fb-icon').textContent=icon;
+    document.getElementById('fb-name').textContent=name;
+    document.getElementById('fb-msg').textContent=msg;
+  }
+};
+
+/* ── CAMERA & QR ── */
+const Camera={
+  _scanner:null,
+  _running:false,
+  start(){
+    if(this._scanner)return;
+    this._scanner=new Html5Qrcode('qr-reader');
+    this._scanner.start({facingMode:'environment'},{qrbox:200,fps:10},code=>{
+      Guests.onQRScan(code);
+    },err=>console.warn('QR error:',err)).then(()=>{
+      this._running=true;
+      document.getElementById('btn-cam-start').style.display='none';
+      document.getElementById('btn-cam-stop').style.display='flex';
+    }).catch(err=>{toast('Erro ao iniciar câmera: '+err.message,'err');});
+  },
+  stop(){
+    if(!this._scanner)return;
+    this._scanner.stop().then(()=>{
+      this._scanner.clear();
+      this._scanner=null;
+      this._running=false;
+      document.getElementById('btn-cam-start').style.display='flex';
+      document.getElementById('btn-cam-stop').style.display='none';
+      document.getElementById('qr-reader').innerHTML='';
+    });
+  },
+  _onScan(code){
+    // Implementação será feita quando QR for gerado
+  }
+};
+
+// Placeholder para quando QR for implementado
+Guests.onQRScan=code=>{
+  const g=Guests._all.find(x=>x.qr_token===code);
+  if(!g){Guests._fb('error','✕','QR','Código não encontrado.');return;}
+  Guests.openCheckinModal(g.id);
+};
+
+/* ── RSVP ── */
+const RSVP={
+  _all:[],
+  _unsub:null,
+  load(){
+    const label=document.getElementById('rsvp-event-label');
+    if(!App._activeId){
+      document.getElementById('rsvp-table-wrap').style.display='none';
+      document.getElementById('no-event-rsvp').style.display='block';
+      if(label)label.textContent='Nenhum evento selecionado';
+      return;
+    }
+    document.getElementById('rsvp-table-wrap').style.display='block';
+    document.getElementById('no-event-rsvp').style.display='none';
+    if(label)label.textContent=App._activeEvent?.nome||'';
+    if(this._unsub)this._unsub();
+    this._unsub=db.collection('events').doc(App._activeId).collection('guests').onSnapshot(snap=>{
+      this._all=snap.docs.map(d=>({...d.data(),id:d.id}));
+      this._renderStats();
+      this._renderTable();
+    });
+  },
+  _renderStats(){
+    const total=this._all.length;
+    const conf=this._all.filter(g=>g.status==='confirmado').length;
+    const wait=this._all.filter(g=>g.status==='aguardando').length;
+    const recus=this._all.filter(g=>g.status==='recusado').length;
+    document.getElementById('rsvp-total').textContent=total;
+    document.getElementById('rsvp-conf').textContent=conf;
+    document.getElementById('rsvp-wait').textContent=wait;
+    document.getElementById('rsvp-recus').textContent=recus;
+  },
+  _renderTable(){
+    const html=this._all.map(g=>`<tr>
+      <td>${esc(g.nome)}</td>
+      <td>${g.telefone||'-'}</td>
+      <td class="col-hide-sm">${g.acompanhantes||0}</td>
+      <td>${statusLabel(g.status)}</td>
+      <td class="col-hide-sm" style="font-size:.8rem">${g.observacoes||'-'}</td>
+      <td style="white-space:nowrap"><button class="icon-btn" onclick="RSVP.editStatus('${g.id}')">✎</button></td>
+    </tr>`).join('');
+    document.getElementById('rsvp-tbody').innerHTML=html||'<tr><td colspan="6" style="text-align:center;color:var(--text-light)">Nenhum convidado</td></tr>';
+  },
+  editStatus(id){
+    const g=this._all.find(x=>x.id===id);
+    if(!g)return;
+    const newStatus=prompt('Status (confirmado/aguardando/recusado):',g.status);
+    if(!newStatus||!['confirmado','aguardando','recusado'].includes(newStatus))return;
+    const payload={status:newStatus};
+    if(newStatus==='confirmado'&&(!g.qr_token||!g.qr_code)) payload.qr_token=g.qr_token||genQrToken();
+    db.collection('events').doc(App._activeId).collection('guests').doc(id).update(payload)
+      .then(async()=>{
+        if(newStatus==='confirmado') await ensureGuestQrData(App._activeId,id,{...g,...payload});
+        if(window.Backup)Backup.registerEvent('rsvp_change');
+        toast('Status atualizado','ok');
+      })
+      .catch(err=>toast('Erro: '+err.message,'err'));
+  },
+  exportXLSX(){
+    if(!App._activeId){toast('Selecione um evento','err');return;}
+    const data=this._all.map(g=>({
+      'Nome':g.nome,
+      'Telefone':g.telefone||'',
+      'Acompanhantes':g.acompanhantes||0,
+      'PAX':1+(g.acompanhantes||0),
+      'Mesa':g.mesa||'',
+      'Status RSVP':statusLabel(g.status),
+      'Observações':g.observacoes||''
+    }));
+    const ws=XLSX.utils.json_to_sheet(data);
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,'RSVP');
+    XLSX.writeFile(wb,`RSVP_${App._activeEvent.nome}_${new Date().toISOString().split('T')[0]}.xlsx`);
+  }
+};
+
+/* ── REPORT ── */
+const Report={
+  _all:[],
+  _unsub:null,
+  _activeTab:'rsvp',
+  load(){
+    const label=document.getElementById('report-event-label');
+    if(!App._activeId){
+      document.getElementById('report-table-wrap').style.display='none';
+      document.getElementById('no-event-report').style.display='block';
+      if(label)label.textContent='—';
+      return;
+    }
+    document.getElementById('report-table-wrap').style.display='block';
+    document.getElementById('no-event-report').style.display='none';
+    if(label)label.textContent=App._activeEvent?.nome||'';
+    this._syncGuests();
+  },
+  _syncGuests(){
+    if(this._unsub)this._unsub();
+    this._unsub=db.collection('events').doc(App._activeId).collection('guests').onSnapshot(snap=>{
+      this._all=snap.docs.map(d=>({...d.data(),id:d.id}));
+      if(this._activeTab==='rsvp')this._renderRsvpPanel();
+      else this._renderCheckinPanel();
+    });
+  },
+  switchTab(tab){
+    this._activeTab=tab;
+    document.getElementById('rtab-rsvp').classList.toggle('active',tab==='rsvp');
+    document.getElementById('rtab-checkin').classList.toggle('active',tab==='checkin');
+    document.getElementById('report-panel-rsvp').style.display=tab==='rsvp'?'block':'none';
+    document.getElementById('report-panel-checkin').style.display=tab==='checkin'?'block':'none';
+    if(tab==='rsvp')this._renderRsvpPanel();
+    else this._renderCheckinPanel();
+  },
+  _renderRsvpPanel(){
+    const total=this._all.length;
+    const conf=this._all.filter(g=>g.status==='confirmado').length;
+    const wait=this._all.filter(g=>g.status==='aguardando').length;
+    const recus=this._all.filter(g=>g.status==='recusado').length;
+    document.getElementById('report-rsvp-stats').innerHTML=`
+      <div class="stat-card"><div class="stat-val">${total}</div><div class="stat-lbl">Total</div></div>
+      <div class="stat-card sage"><div class="stat-val">${conf}</div><div class="stat-lbl">Confirmados</div></div>
+      <div class="stat-card warn"><div class="stat-val">${wait}</div><div class="stat-lbl">Aguardando</div></div>
+      <div class="stat-card"><div class="stat-val">${recus}</div><div class="stat-lbl">Recusados</div></div>
+    `;
+    const html=this._all.map(g=>`<tr>
+      <td>${esc(g.nome)}</td>
+      <td>${g.telefone||'-'}</td>
+      <td class="col-hide-sm">${g.acompanhantes||0}</td>
+      <td>${1+(g.acompanhantes||0)}</td>
+      <td class="col-hide-sm">${g.mesa||'-'}</td>
+      <td>${statusLabel(g.status)}</td>
+    </tr>`).join('');
+    document.getElementById('report-rsvp-tbody').innerHTML=html;
+  },
+  _renderCheckinPanel(){
+    const total=this._all.reduce((sum,g)=>(sum+1+(g.acompanhantes||0)),0);
+    const presentes=this._all.reduce((sum,g)=>(sum+(g.presentesNaEntrada||0)),0);
+    const ausentes=Math.max(total-presentes,0);
+    const ppTotal=presentes;
+    document.getElementById('report-checkin-stats').innerHTML=`
+      <div class="stat-card"><div class="stat-val">${total}</div><div class="stat-lbl">Total de Convidados</div></div>
+      <div class="stat-card sage"><div class="stat-val">${presentes}</div><div class="stat-lbl">Presentes</div></div>
+      <div class="stat-card warn"><div class="stat-val">${ausentes}</div><div class="stat-lbl">Ausentes</div></div>
+      <div class="stat-card"><div class="stat-val">${ppTotal}</div><div class="stat-lbl">PP Total</div></div>
+    `;
+    const html=this._all.filter(g=>g.checkedIn).map(g=>`<tr>
+      <td>${esc(g.nome)}</td>
+      <td class="col-hide-sm">${g.mesa||'-'}</td>
+      <td>${statusLabel(g.status)}</td>
+      <td>${fmtTime(g.checkinTime)}</td>
+      <td>${g.presentesNaEntrada||0}</td>
+      <td>${esc(g.checkedBy||'')}</td>
+    </tr>`).join('');
+    document.getElementById('report-checkin-tbody').innerHTML=html;
+  },
+  exportRsvpXLSX(){
+    if(!App._activeId){toast('Selecione um evento','err');return;}
+    const data=this._all.map(g=>({
+      'Nome':g.nome,
+      'Telefone':g.telefone||'',
+      'Acompanhantes':g.acompanhantes||0,
+      'Status RSVP':statusLabel(g.status)
+    }));
+    const ws=XLSX.utils.json_to_sheet(data);
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,'RSVP');
+    XLSX.writeFile(wb,`Report_RSVP_${App._activeEvent.nome}_${new Date().toISOString().split('T')[0]}.xlsx`);
+  },
+  exportCheckinXLSX(){
+    if(!App._activeId){toast('Selecione um evento','err');return;}
+    const data=this._all.filter(g=>g.checkedIn).map(g=>({
+      'Nome':g.nome,
+      'Mesa':g.mesa||'',
+      'Status RSVP':statusLabel(g.status),
+      'Horário':fmtTime(g.checkinTime),
+      'PP':g.presentesNaEntrada||0,
+      'HOSTESSS':g.checkedBy||''
+    }));
+    const ws=XLSX.utils.json_to_sheet(data);
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,'Check-in');
+    XLSX.writeFile(wb,`Report_CheckIn_${App._activeEvent.nome}_${new Date().toISOString().split('T')[0]}.xlsx`);
+  }
+};
+
+/* ── CONFIRMAÇÃO ── */
+const Confirm={
+  _resolve:null,
+  show(title,msg,onConfirm){
+    document.getElementById('confirm-title').textContent=title;
+    document.getElementById('confirm-msg').textContent=msg;
+    this._resolve=onConfirm;
+    document.getElementById('confirm-modal').classList.add('open');
+  },
+  confirm(){
+    if(this._resolve)this._resolve();
+    this.cancel();
+  },
+  cancel(){
+    document.getElementById('confirm-modal').classList.remove('open');
+    this._resolve=null;
+  }
+};
+
+/* ── INIT ── */
+document.addEventListener('DOMContentLoaded',()=>{
+  App.init();
+});
+</script>
+<script src="backup-module.js"></script>
+</body>
+</html>
