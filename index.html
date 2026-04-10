@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Inspire — Gestão de Eventos</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#87a492">
+  <meta name="description" content="Sistema de credenciamento, RSVP e check-in para eventos com suporte offline">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore-compat.js"></script>
+</head>
+<body>
+
+<div class="app-header">
+  <div class="header-left">
+    <div class="header-logo-wrap" onclick="showPage('home')">
+      <img id="header-logo-img" src="logo-branco.png?v=6" alt="Inspire" class="header-logo">
+    </div>
+  </div>
+
+  <nav class="header-nav" id="header-nav">
+    <button class="nav-tab active" onclick="showPage('home')" data-page="home">Home</button>
+    <button class="nav-tab" onclick="showPage('events')" data-page="events">Eventos</button>
+    <button class="nav-tab" onclick="showPage('guests')" data-page="guests">Convidados & Check-in</button>
+    <button class="nav-tab" onclick="showPage('rsvp')" data-page="rsvp">RSVP</button>
+    <button class="nav-tab" onclick="showPage('report')" data-page="report">Relatórios</button>
+    <button class="nav-tab" onclick="showPage('settings')" data-page="settings">Config</button>
+  </nav>
+
+  <div class="header-right">
+    <button class="login-btn" onclick="openModal('modal-login')" id="login-btn">Entrar</button>
+    <button class="hamburger" onclick="toggleNav()" aria-label="Abrir menu">☰</button>
+  </div>
+</div>
+
+<div class="hostess-strip" id="hostess-strip" style="display:none">
+  <div class="container hostess-strip-inner">
+    <span class="hostess-label">HOSTESS</span>
+    <strong id="hostess-strip-name">—</strong>
+    <button class="login-btn hostess-exit-btn" onclick="Receptionist.logout()">Sair</button>
+  </div>
+</div>
+
+<div class="page active" id="page-home">
+  <div class="container home-wrap">
+    <img id="home-logo-img" src="logo-verde.png?v=6" alt="Inspire" class="home-logo">
+    <div class="home-title">SISTEMA DE GESTÃO DE EVENTOS</div>
+    <div class="home-active-card">
+      <p id="home-active-event">Nenhum evento ativo.</p>
+      <div class="home-active-link" onclick="showPage('events')">Criar ou selecionar um evento →</div>
+    </div>
+    <div class="home-cards">
+      <button class="home-card-btn" onclick="showPage('events')"><div class="home-card-icon">📅</div><div class="home-card-title">EVENTOS</div></button>
+      <button class="home-card-btn" onclick="showPage('guests')"><div class="home-card-icon">👥</div><div class="home-card-title">CONVIDADOS</div></button>
+      <button class="home-card-btn" onclick="showPage('guests')"><div class="home-card-icon">✓</div><div class="home-card-title">CHECK-IN</div></button>
+      <button class="home-card-btn" onclick="showPage('report')"><div class="home-card-icon">📊</div><div class="home-card-title">RELATÓRIO</div></button>
+    </div>
+  </div>
+</div>
+
+<div class="page" id="page-events">
+  <div class="container page-events-hero">
+    <div class="page-header-row"><div><h1 class="page-title">Gestão de <em>Eventos</em></h1></div></div>
+    <div class="card" style="margin-bottom:22px">
+      <div class="card-head">+ Novo Evento</div>
+      <div class="card-body">
+        <div style="display:grid;grid-template-columns:1fr;gap:14px">
+          <div><label style="font-size:.9rem;font-weight:600">Nome do Evento *</label><input type="text" id="new-event-name" placeholder="Ex: Casamento Ana & Rafael" style="width:100%;margin-top:8px;padding:14px 16px;border:1px solid var(--border);border-radius:var(--r-sm)"></div>
+          <div><label style="font-size:.9rem;font-weight:600">Data *</label><input type="date" id="new-event-date" style="width:100%;margin-top:8px;padding:14px 16px;border:1px solid var(--border);border-radius:var(--r-sm)"></div>
+          <div><label style="font-size:.9rem;font-weight:600">Horário</label><input type="text" id="new-event-time" style="width:100%;margin-top:8px;padding:14px 16px;border:1px solid var(--border);border-radius:var(--r-sm)"></div>
+          <div><label style="font-size:.9rem;font-weight:600">Local / Espaço</label><input type="text" id="new-event-location" placeholder="Ex: Espaço Villa Lobos, SP" style="width:100%;margin-top:8px;padding:14px 16px;border:1px solid var(--border);border-radius:var(--r-sm)"></div>
+          <div><label style="font-size:.9rem;font-weight:600">Cliente / Contratante</label><input type="text" id="new-event-client" placeholder="Nome do cliente" style="width:100%;margin-top:8px;padding:14px 16px;border:1px solid var(--border);border-radius:var(--r-sm)"></div>
+          <label style="font-size:.9rem;font-weight:600"><input type="checkbox" id="new-event-use-rsvp"> Usar RSVP para este evento</label>
+          <div><button class="btn btn-primary" onclick="Events.createNew()">Criar Evento</button></div>
+        </div>
+      </div>
+    </div>
+    <h2 style="font-size:1.25rem;letter-spacing:.14em;color:var(--sage-dark);margin-bottom:14px">EVENTOS CADASTRADOS</h2>
+    <div id="events-list"></div>
+    <div class="reset-area"><button class="btn btn-outline" onclick="App.clearLocalData()">⟳ Limpar todos os dados</button></div>
+  </div>
+</div>
+
+<div class="page" id="page-guests">
+  <div class="container">
+    <div class="page-header-row">
+      <div><h1 class="page-title">Convidados & <em>Check-in</em></h1><p id="guests-event-label" class="page-subtitle">Selecione um evento</p></div>
+      <div class="action-row">
+        <button class="btn btn-outline" onclick="openModal('modal-import')">⬆ Importar</button>
+        <button class="btn btn-primary" onclick="Guests.exportXLSX()">⬇ Exportar</button>
+      </div>
+    </div>
+
+    <div class="unified-layout" id="unified-guests-wrap" style="display:none">
+      <div class="unified-left">
+        <div class="feedback-card idle" id="feedback">
+          <div class="fb-icon">—</div>
+          <div class="fb-name" id="fb-name">Pronto</div>
+          <div class="fb-msg" id="fb-msg">Sistema aguardando ação</div>
+        </div>
+        <div class="card">
+          <div class="card-head">📷 QR Code</div>
+          <div id="qr-reader"></div>
+          <div class="card-body" style="padding:10px 12px">
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn btn-primary" id="btn-cam-start" onclick="Camera.start()">▶ Iniciar Câmera</button>
+              <button class="btn btn-outline" id="btn-cam-stop" onclick="Camera.stop()" style="display:none">⏹ Parar</button>
+            </div>
+            <p class="cam-hint">Funciona em HTTPS (link Netlify) ✓</p>
+          </div>
+        </div>
+        <div class="card manual-section">
+          <div class="card-head">🔍 Busca Manual</div>
+          <div class="card-body">
+            <div class="manual-row">
+              <input id="manual-input" class="manual-input" placeholder="Nome do convidado..." oninput="Guests.onSearch(this.value)" onkeypress="if(event.key==='Enter')Guests.doManual()">
+              <button class="btn btn-primary" onclick="Guests.doManual()">Check-in</button>
+            </div>
+            <div id="search-results"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="unified-right">
+        <div class="card" style="display:flex;flex-direction:column;min-height:400px">
+          <div class="card-head"><span>Lista de Convidados</span><span class="badge-count" id="guests-count">0</span></div>
+          <div style="padding:10px;flex-shrink:0;border-bottom:1px solid var(--border)">
+            <input class="search-box" style="width:100%;margin-bottom:8px" placeholder="🔍 Filtrar..." oninput="Guests.filterList(this.value)">
+            <div class="filter-group">
+              <button class="filter-btn active" onclick="Guests.setFilter('todos',this)">Todos</button>
+              <button class="filter-btn" onclick="Guests.setFilter('presente',this)">Presentes</button>
+              <button class="filter-btn" onclick="Guests.setFilter('pendente',this)">Pendentes</button>
+            </div>
+          </div>
+          <div class="checkin-list" id="guests-list"><div class="empty-state">Selecione um evento.</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="no-guests" class="empty-state">Selecione um evento na aba <strong>Eventos</strong>.</div>
+  </div>
+</div>
+
+<div class="page" id="page-rsvp">
+  <div class="container">
+    <div class="page-header-row">
+      <div><h1 class="page-title">RSVP <em>do Evento</em></h1><p id="rsvp-event-label" class="page-subtitle">Selecione um evento</p></div>
+      <div class="action-row"><button class="btn btn-primary" onclick="RSVP.exportXLSX()">⬇ Exportar RSVP</button></div>
+    </div>
+    <div id="no-event-rsvp" class="empty-state">Selecione um evento na aba <strong>Eventos</strong>.</div>
+    <div id="rsvp-table-wrap" style="display:none">
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:18px">
+        <div class="stat-card"><div class="stat-val" id="rsvp-total">—</div><div class="stat-lbl">Total</div></div>
+        <div class="stat-card sage"><div class="stat-val" id="rsvp-conf">—</div><div class="stat-lbl">Confirmados</div></div>
+        <div class="stat-card warn"><div class="stat-val" id="rsvp-wait">—</div><div class="stat-lbl">Aguardando</div></div>
+        <div class="stat-card"><div class="stat-val" id="rsvp-recus">—</div><div class="stat-lbl">Recusados</div></div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Nome</th><th>Telefone</th><th class="col-hide-sm">Acomp.</th><th>Status RSVP</th><th class="col-hide-sm">Endereço</th><th class="col-hide-sm">Origem</th><th class="col-hide-sm">Observações</th><th>Ações</th></tr></thead>
+          <tbody id="rsvp-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="page" id="page-report">
+  <div class="container">
+    <div class="page-header-row">
+      <div><h1 class="page-title">Relatórios <em>do Evento</em></h1><p id="report-event-label" class="page-subtitle">—</p></div>
+      <div class="action-row"><button class="btn btn-outline" onclick="openDashboard()">👁 Dashboard ao vivo</button></div>
+    </div>
+    <div id="no-event-report" class="empty-state">Selecione um evento na aba <strong>Eventos</strong>.</div>
+    <div id="report-table-wrap" style="display:none">
+      <div style="display:flex;gap:4px;margin-bottom:18px;border-bottom:2px solid var(--border);padding-bottom:0">
+        <button class="report-tab-btn active" id="rtab-checkin" onclick="Report.switchTab('checkin')" style="padding:9px 18px;border:none;background:none;font-family:var(--font-b);font-size:.88rem;font-weight:600;color:var(--sage-dark);border-bottom:2px solid var(--sage-dark);margin-bottom:-2px;cursor:pointer">✓ Checkin</button>
+        <button class="report-tab-btn" id="rtab-rsvp" onclick="Report.switchTab('rsvp')" style="padding:9px 18px;border:none;background:none;font-family:var(--font-b);font-size:.88rem;font-weight:500;color:var(--text-light);cursor:pointer">📋 RSVP</button>
+      </div>
+
+      <div id="report-panel-rsvp" style="display:none">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button class="btn btn-primary" onclick="Report.exportRsvpXLSX()">⬇ Exportar RSVP</button></div>
+        <div class="stats-grid" style="margin-bottom:14px" id="report-rsvp-stats"></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Nome</th><th>Telefone</th><th class="col-hide-sm">Acomp.</th><th>PAX</th><th class="col-hide-sm">Mesa</th><th>Status RSVP</th></tr></thead>
+            <tbody id="report-rsvp-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="report-panel-checkin">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button class="btn btn-primary" onclick="Report.exportCheckinXLSX()">⬇ Exportar Checkin</button></div>
+        <div class="stats-grid" style="margin-bottom:14px" id="report-checkin-stats"></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Nome</th><th class="col-hide-sm">Mesa</th><th class="col-hide-sm">Setor</th><th>Status RSVP</th><th>Check-in (hora)</th><th>Presentes (PP)</th><th>HOSTESS</th></tr></thead>
+            <tbody id="report-checkin-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="page" id="page-settings">
+  <div class="container">
+    <div class="page-header-row"><div><h1 class="page-title">Configurações</h1></div></div>
+    <div class="card">
+      <div class="card-head">Sincronização</div>
+      <div class="card-body">
+        <p style="margin-bottom:10px">Status: <strong id="sync-status">Verificando...</strong></p>
+        <button class="btn btn-outline" onclick="App.checkOnlineStatus()">🔄 Verificar Conexão</button>
+      </div>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <div class="card-head">Cache & Armazenamento</div>
+      <div class="card-body">
+        <p style="font-size:.9rem;color:var(--text-light);margin-bottom:10px">Dados salvos localmente para operação offline.</p>
+        <button class="btn btn-outline" onclick="App.clearLocalData()">🗑 Limpar Cache</button>
+      </div>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <div class="card-head">Backup Google Drive</div>
+      <div class="card-body">
+        <p style="font-size:.9rem;color:var(--text-light);margin-bottom:10px">Crie backups automáticos e manuais do evento ativo.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <button class="btn btn-primary" id="backup-btn" onclick="Backup.doBackupNow()">💾 Backup Agora</button>
+          <span id="backup-status" style="font-size:.82rem;color:var(--text-light)"></span>
+        </div>
+        <div id="backup-last-time" style="font-size:.78rem;color:var(--text-light);margin-top:8px"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-login">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-login')">✕</button>
+    <h2 class="modal-title">Entrar</h2>
+    <div style="margin-bottom:16px">
+      <label style="font-size:.9rem;font-weight:600;color:var(--forest)">Receptionist / HOSTESS</label>
+      <input type="text" id="login-name" placeholder="Seu nome" style="width:100%;margin-top:8px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--r-sm);font-size:1rem;">
+    </div>
+    <div style="margin-bottom:16px">
+      <label style="font-size:.9rem;font-weight:600;color:var(--forest)">Senha</label>
+      <input type="password" id="login-pass" placeholder="Senha" style="width:100%;margin-top:8px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--r-sm);font-size:1rem;">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('modal-login')">Cancelar</button>
+      <button class="btn btn-primary" onclick="Receptionist.login()">Entrar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-checkin">
+  <div class="modal">
+    <button class="modal-close" onclick="closeCheckinModal()">✕</button>
+    <h2 class="modal-title">Confirmar <em>Check-in</em></h2>
+    <div id="ci-modal-info" style="margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--border);font-size:.95rem;line-height:1.6"></div>
+    <div style="margin-bottom:14px">
+      <label style="font-size:.9rem;font-weight:600;color:var(--forest)">Quantos compareceram?</label>
+      <input type="number" id="ci-presentes" placeholder="1" min="1" max="10" style="width:100%;margin-top:6px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--r-sm)">
+    </div>
+    <div style="margin-bottom:16px">
+      <label style="font-size:.9rem;font-weight:600;color:var(--forest)">Acompanhante (nome extra)</label>
+      <input type="text" id="ci-extra-nome" placeholder="Opcional" style="width:100%;margin-top:6px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--r-sm)">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeCheckinModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="Guests.confirmCheckin()">✓ Confirmar Check-in</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-edit-event">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-edit-event')">✕</button>
+    <h2 class="modal-title">Editar <em>Evento</em></h2>
+    <div style="margin-bottom:14px"><label style="font-size:.9rem;font-weight:600">Nome do Evento</label><input type="text" id="edit-event-name" style="width:100%;margin-top:6px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--r-sm)"></div>
+    <div style="margin-bottom:14px"><label style="font-size:.9rem;font-weight:600">Data</label><input type="date" id="edit-event-date" style="width:100%;margin-top:6px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--r-sm)"></div>
+    <div style="margin-bottom:14px"><label style="font-size:.9rem;font-weight:600">Cliente</label><input type="text" id="edit-event-client" style="width:100%;margin-top:6px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--r-sm)"></div>
+    <div style="margin-bottom:14px"><label style="font-size:.9rem;font-weight:600"><input type="checkbox" id="edit-event-use-rsvp"> Usar RSVP</label></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('modal-edit-event')">Cancelar</button>
+      <button class="btn btn-danger" onclick="Events.deleteEvent()" style="margin-right:auto">🗑 Deletar</button>
+      <button class="btn btn-primary" onclick="Events.saveEdit()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-import">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-import')">✕</button>
+    <h2 class="modal-title">Importar <em>Lista</em></h2>
+    <p style="font-size:.88rem;color:var(--text-mid);margin-bottom:16px">Escolha o tipo de importação antes de selecionar o arquivo.</p>
+    <div style="margin-bottom:14px">
+      <label style="font-size:.9rem;font-weight:600;display:block;margin-bottom:8px">Tipo de Importação:</label>
+      <select id="import-type" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:var(--r-sm);font-size:.95rem">
+        <option value="guests">Convidados (RSVP + Check-in)</option>
+        <option value="rsvp">Apenas RSVP</option>
+      </select>
+    </div>
+    <div style="margin-bottom:16px"><input type="file" id="import-file" accept=".xlsx,.xls,.csv" style="width:100%;padding:8px 4px"></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('modal-import')">Cancelar</button>
+      <button class="btn btn-primary" onclick="Guests.importXLSX()">Importar</button>
+    </div>
+  </div>
+</div>
+
+<div class="confirm-overlay" id="confirm-modal">
+  <div class="confirm-modal">
+    <h3 class="confirm-title" id="confirm-title"></h3>
+    <p class="confirm-msg" id="confirm-msg"></p>
+    <div class="confirm-actions">
+      <button class="btn btn-outline" id="confirm-no" onclick="Confirm.cancel()">Cancelar</button>
+      <button class="btn btn-primary" id="confirm-yes" onclick="Confirm.confirm()">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-edit-guest">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-edit-guest')">✕</button>
+    <h2 class="modal-title">Editar <em>Convidado</em></h2>
+    <div style="display:grid;gap:12px">
+      <div><label style="font-size:.9rem;font-weight:600">Nome</label><input type="text" id="edit-guest-name" style="width:100%;margin-top:6px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--r-sm)"></div>
+      <div><label style="font-size:.9rem;font-weight:600">Telefone</label><input type="text" id="edit-guest-phone" style="width:100%;margin-top:6px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--r-sm)"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div><label style="font-size:.9rem;font-weight:600">Acompanhantes</label><input type="number" id="edit-guest-acomp" min="0" style="width:100%;margin-top:6px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--r-sm)"></div>
+        <div><label style="font-size:.9rem;font-weight:600">Mesa</label><input type="text" id="edit-guest-table" style="width:100%;margin-top:6px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--r-sm)"></div>
+      </div>
+      <div><label style="font-size:.9rem;font-weight:600">Setor</label><input type="text" id="edit-guest-setor" style="width:100%;margin-top:6px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--r-sm)"></div>
+      <div>
+        <label style="font-size:.9rem;font-weight:600">Status RSVP</label>
+        <select id="edit-guest-status" style="width:100%;margin-top:6px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--r-sm)">
+          <option value="aguardando">Aguardando</option>
+          <option value="confirmado">Confirmado</option>
+          <option value="recusado">Recusado</option>
+        </select>
+      </div>
+      <div><label style="font-size:.9rem;font-weight:600">Observações</label><textarea id="edit-guest-obs" rows="3" style="width:100%;margin-top:6px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--r-sm)"></textarea></div>
+      <div><label style="font-size:.9rem;font-weight:600">Endereço</label><input type="text" id="edit-guest-address" style="width:100%;margin-top:6px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--r-sm)"></div>
+      <div><label style="font-size:.9rem;font-weight:600">Origem do Convidado</label><input type="text" id="edit-guest-origem" style="width:100%;margin-top:6px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--r-sm)"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('modal-edit-guest')">Cancelar</button>
+      <button class="btn btn-primary" onclick="Guests.saveGuestEdit()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<footer class="footer-brand"><strong>Inspire Consultoria e Produção de Eventos · Gestão Inteligente</strong></footer>
+
+<script src="script.js"></script>
+<script src="backup-module.js"></script>
+</body>
+</html>
